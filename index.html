@@ -529,13 +529,29 @@
            } catch (e) { alert('Error al guardar: ' + e.message, 'error'); }
        };
 
-       const handleApprove = async (req) => {
-           try {
-               await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', req.uid), { status: 'approved' });
-               await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', req.id));
-               alert('Usuario aprobado con éxito', 'success');
-           } catch(e) { alert('Error al aprobar: ' + e.message, 'error'); }
-       };
+       // CÓDIGO NUEVO (CORREGIDO Y BLINDADO)
+const handleApprove = async (req) => {
+    try {
+        // Usamos setDoc en lugar de updateDoc.
+        // { merge: true } asegura que si existe, solo actualice el status.
+        // Pero si NO existe (tu error), lo CREA de nuevo usando los datos de 'req'.
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', req.uid), {
+            name: req.name,
+            empId: req.empId,
+            area: req.area,
+            email: req.email,
+            status: 'approved'
+        }, { merge: true });
+
+        // Una vez asegurado el perfil, borramos la solicitud
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', req.id));
+
+        alert('Usuario aprobado y perfil verificado', 'success');
+    } catch(e) { 
+        console.error(e);
+        alert('Error al aprobar: ' + e.message, 'error'); 
+    }
+};
 
        const handleReject = async (id) => {
            try {
@@ -628,4 +644,5 @@
     root.render(<App />);
   </script>
 </body>
+
 </html>
