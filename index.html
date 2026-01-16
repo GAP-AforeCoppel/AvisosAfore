@@ -213,22 +213,30 @@
       };
 
       const handleRegister = async (data) => {
-        try {
-            const userCred = await createUserWithEmailAndPassword(auth, data.email, data.password);
-            await updateProfile(userCred.user, { displayName: data.name });
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'requests'), {
-                uid: userCred.user.uid, name: data.name, empId: data.empId, area: data.area, email: data.email, date: new Date().toISOString(), status: 'pending'
-            });
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', userCred.user.uid), {
-                name: data.name, empId: data.empId, area: data.area, email: data.email, status: 'pending'
-            });
-            alert('Solicitud enviada. Espera aprobación.', 'success');
-            await signOut(auth); 
-            setView('login');
-        } catch (e) {
-            alert('Error al registrar: ' + e.message, 'error');
-        }
-      };
+  try {
+      const userCred = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const uid = userCred.user.uid; // Usamos el ID único de Firebase Auth
+
+      await updateProfile(userCred.user, { displayName: data.name });
+
+      // Guardamos directamente en PROFILES. El ID del documento SERÁ el UID del usuario.
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', uid), {
+          uid: uid, 
+          name: data.name, 
+          empId: data.empId, 
+          area: data.area, 
+          email: data.email, 
+          date: new Date().toISOString(), 
+          status: 'pending'
+      });
+
+      alert('Solicitud enviada. Por favor espera a que el administrador apruebe tu acceso.', 'success');
+      await signOut(auth); 
+      setView('login');
+  } catch (e) {
+      alert('Error al registrar: ' + e.message, 'error');
+  }
+};
 
       const handleLogout = async () => { await signOut(auth); setKioskMode(false); };
 
@@ -343,15 +351,19 @@
       }, [user]);
 
       // LISTEN TO REQUESTS (Admin Only)
-      useEffect(() => {
-          if (!user || user.role !== 'admin') return;
-          const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'requests'));
-          const unsub = onSnapshot(q, (snapshot) => {
-              const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-              setRequests(data.filter(r => r.status === 'pending'));
-          });
-          return () => unsub();
-      }, [user]);
+     useEffect(() => {
+    if (!user || user.role !== 'admin') return;
+    // Ahora escuchamos directamente en 'profiles' buscando solo los pendientes
+    const q = query(
+        collection(db, 'artifacts', appId, 'public', 'data', 'profiles'), 
+        where('status', '==', 'pending')
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
+        const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        setRequests(data);
+    });
+    return () => unsub();
+}, [user]);
 
       const visibleNotices = notices.filter(n => user.role === 'admin' || n.active);
       const pinnedNotice = visibleNotices.find(n => n.pinned);
@@ -560,21 +572,11 @@
        // CÓDIGO NUEVO (CORREGIDO Y BLINDADO)
 const handleApprove = async (req) => {
     try {
-        // Usamos setDoc en lugar de updateDoc.
-        // { merge: true } asegura que si existe, solo actualice el status.
-        // Pero si NO existe (tu error), lo CREA de nuevo usando los datos de 'req'.
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', req.uid), {
-            name: req.name,
-            empId: req.empId,
-            area: req.area,
-            email: req.email,
+        // Simplemente cambiamos el estado de 'pending' a 'approved' en el mismo documento
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', req.id), {
             status: 'approved'
-        }, { merge: true });
-
-        // Una vez asegurado el perfil, borramos la solicitud
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'requests', req.id));
-
-        alert('Usuario aprobado y perfil verificado', 'success');
+        });
+        alert('Usuario aprobado correctamente', 'success');
     } catch(e) { 
         console.error(e);
         alert('Error al aprobar: ' + e.message, 'error'); 
@@ -674,6 +676,7 @@ const handleApprove = async (req) => {
 </body>
 
 </html>
+
 
 
 
