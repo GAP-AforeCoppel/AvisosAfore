@@ -623,78 +623,78 @@ const handleApprove = async (req) => {
                   {tab === 'editor' && <EditorTab notice={editingNotice} setNotice={setEditingNotice} onSave={handleSave} onCreateNew={() => setEditingNotice({ id: null, type: 'info', title: '', subtitle: '', date: 'HOY', ticker: '', active: true, pinned: false, slides: [{ id: Date.now(), title: 'Inicio', subtitle: '', icon: 'Info', type: 'text', content: [{value: ''}] }] })} />}
                   {tab === 'preview' && <div className="w-full h-full flex items-center justify-center p-8 overflow-y-auto bg-slate-200"><div className="scale-[0.8] origin-center w-full max-w-5xl"><NextGenViewer data={editingNotice} kioskMode={false} /></div></div>}
                   {tab === 'requests' && (
-                      {/* --- HERRAMIENTA DE RESCATE EVOLUCIONADA --- */}
-<div className="bg-blue-50 p-6 rounded-2xl mb-8 border border-blue-100 shadow-sm">
-    <h4 className="text-sm font-bold text-blue-800 mb-3 flex items-center gap-2">
-        🚀 Activar Acceso Directo (Desde Auth)
-    </h4>
-    <div className="flex flex-col md:flex-row gap-3">
-        <input 
-            id="rescueUid" 
-            placeholder="Pegar UID de Auth" 
-            className="flex-1 p-3 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-blue-400" 
-        />
-        <input 
-            id="rescueEmail" 
-            placeholder="Pegar Correo de Auth" 
-            className="flex-1 p-3 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-blue-400" 
-        />
-        <button 
-            onClick={async () => {
-                const uid = document.getElementById('rescueUid').value.trim();
-                const email = document.getElementById('rescueEmail').value.trim();
-                
-                if(!uid || !email) return alert("Por favor, pega el UID y el Correo", 'error');
-                
-                try {
-                    // Usamos el correo como nombre temporal para que el usuario pueda entrar
-                    // El usuario podrá actualizar su nombre real después o tú lo verás al entrar
-                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', uid), {
-                        uid, 
-                        email,
-                        name: email.split('@')[0].toUpperCase(), // Usa la primera parte del correo como nombre temporal
-                        status: 'approved', 
-                        role: 'user', 
-                        area: 'RESCATADO', 
-                        empId: 'S/N', 
-                        date: new Date().toISOString()
-                    });
-                    alert("¡Acceso activado para: " + email, "success");
-                    document.getElementById('rescueUid').value = "";
-                    document.getElementById('rescueEmail').value = "";
-                } catch(e) { 
-                    alert("Error: " + e.message, "error"); 
-                }
-            }}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95"
-        >
-            ACTIVAR AHORA
-        </button>
-    </div>
-    <p className="text-[11px] text-blue-500 mt-3 font-medium">
-        * Copia el UID y el Correo desde la consola de Firebase. El nombre se generará automáticamente a partir del correo.
-    </p>
-</div>
-{/* --- FIN HERRAMIENTA DE RESCATE --- */}
+                      <div className="p-8 max-w-4xl mx-auto overflow-y-auto h-full">
+                        <h3 className="text-xl font-bold text-slate-700 mb-6">Solicitudes de Acceso Pendientes</h3>
+                        
+                        {/* --- HERRAMIENTA DE RESCATE --- */}
+                        <div className="bg-blue-50 p-6 rounded-2xl mb-8 border border-blue-100 shadow-sm">
+                            <h4 className="text-sm font-bold text-blue-800 mb-3 flex items-center gap-2">
+                                🚀 Activar Acceso Directo (Desde Auth)
+                            </h4>
+                            <div className="flex flex-col md:flex-row gap-3">
+                                <input 
+                                    id="rescueUid" 
+                                    placeholder="Pegar UID de Auth" 
+                                    className="flex-1 p-3 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-blue-400" 
+                                />
+                                <input 
+                                    id="rescueEmail" 
+                                    placeholder="Pegar Correo de Auth" 
+                                    className="flex-1 p-3 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-blue-400" 
+                                />
+                                <button 
+                                    onClick={async () => {
+                                        const uid = document.getElementById('rescueUid').value.trim();
+                                        const email = document.getElementById('rescueEmail').value.trim();
+                                        if(!uid || !email) return alert("Por favor, pega el UID y el Correo", 'error');
+                                        try {
+                                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', uid), {
+                                                uid, email,
+                                                name: email.split('@')[0].toUpperCase(),
+                                                status: 'approved', role: 'user', area: 'RESCATADO', empId: 'S/N', 
+                                                date: new Date().toISOString()
+                                            });
+                                            alert("¡Acceso activado para: " + email, "success");
+                                            document.getElementById('rescueUid').value = "";
+                                            document.getElementById('rescueEmail').value = "";
+                                        } catch(e) { alert("Error: " + e.message, "error"); }
+                                    }}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95"
+                                >
+                                    ACTIVAR AHORA
+                                </button>
+                            </div>
+                            <p className="text-[11px] text-blue-500 mt-3 font-medium">
+                                * Copia el UID y el Correo desde la consola de Firebase.
+                            </p>
+                        </div>
+
+                        {/* --- LISTA DE SOLICITUDES --- */}
                         <div className="space-y-4">
                             {requests.length === 0 && <div className="text-center text-slate-400 mt-10">No hay solicitudes pendientes.</div>}
                             {requests.map(req => (
                                 <div key={req.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-xl">{req.name.charAt(0)}</div>
-                                        <div><h4 className="font-bold text-slate-800">{req.name} <span className="text-slate-400 font-normal">({req.empId})</span></h4><div className="flex gap-2 text-xs font-bold mt-1"><span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded">{req.area}</span><span className="text-slate-400">{req.email}</span></div></div>
+                                        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-xl">
+                                            {req.name ? req.name.charAt(0) : '?'}
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-slate-800">{req.name} <span className="text-slate-400 font-normal">({req.empId})</span></h4>
+                                            <div className="flex gap-2 text-xs font-bold mt-1">
+                                                <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded">{req.area}</span>
+                                                <span className="text-slate-400">{req.email}</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="flex gap-3"><button onClick={() => { if(confirm('¿Rechazar solicitud?')) handleReject(req.id); }} className="px-4 py-2 rounded-xl text-red-500 font-bold hover:bg-red-50 border border-transparent hover:border-red-100">Rechazar</button><button onClick={() => handleApprove(req)} className="px-6 py-2 rounded-xl bg-coppel-blue text-white font-bold hover:brightness-110 shadow-lg shadow-blue-200">Aprobar Acceso</button></div>
+                                    <div className="flex gap-3">
+                                        <button onClick={() => { if(confirm('¿Rechazar solicitud?')) handleReject(req.id); }} className="px-4 py-2 rounded-xl text-red-500 font-bold hover:bg-red-50">Rechazar</button>
+                                        <button onClick={() => handleApprove(req)} className="px-6 py-2 rounded-xl bg-coppel-blue text-white font-bold hover:brightness-110 shadow-lg">Aprobar Acceso</button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
                       </div>
                   )}
-              </div>
-           </div>
-        </div>
-       );
-    }
 
     function EditorTab({ notice, setNotice, onSave, onCreateNew }) {
       const [activeSlideIdx, setActiveSlideIdx] = useState(0);
@@ -743,6 +743,7 @@ const handleApprove = async (req) => {
 </body>
 
 </html>
+
 
 
 
