@@ -693,8 +693,8 @@ const handleApprove = async (req) => {
                                             </div>
                                         </div>
                                         <div className="flex gap-3">
-                                            <button onClick={() => { if(confirm('¿Rechazar y eliminar esta solicitud?')) handleReject(req.id); }} className="px-4 py-2 rounded-xl text-red-500 font-bold hover:bg-red-50 transition-colors">Rechazar</button>
-                                            <button onClick={() => handleApprove(req)} className="px-6 py-2 rounded-xl bg-coppel-blue text-white font-bold hover:brightness-110 shadow-lg shadow-blue-100 transition-all">Aprobar Acceso</button>
+                                            <button onClick={() => { if(confirm('¿Rechazar y eliminar esta solicitud?')) handleReject(req.id); }} className="px-4 py-2 rounded-xl text-red-500 font-bold hover:bg-red-50">Rechazar</button>
+                                            <button onClick={() => handleApprove(req)} className="px-6 py-2 rounded-xl bg-coppel-blue text-white font-bold hover:brightness-110 shadow-lg">Aprobar Acceso</button>
                                         </div>
                                     </div>
                                 ))
@@ -702,7 +702,12 @@ const handleApprove = async (req) => {
                         </div>
                       </div>
                   )}
-
+              </div> {/* <-- Cierre de contenedor central */}
+           </div> {/* <-- Cierre de ventana blanca */}
+        </div> {/* <-- Cierre de fondo oscuro (overlay) */}
+       );
+    }
+    
     function EditorTab({ notice, setNotice, onSave, onCreateNew }) {
       const [activeSlideIdx, setActiveSlideIdx] = useState(0);
       const updateMain = (k, v) => setNotice(p => ({ ...p, [k]: v }));
@@ -750,6 +755,7 @@ const handleApprove = async (req) => {
 </body>
 
 </html>
+
 
 
 
