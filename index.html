@@ -88,9 +88,15 @@
       if (!url) return '';
       if (url.includes('drive.google.com') && url.includes('/file/d/')) {
         try {
+          // Extraemos el ID del archivo
           let id = url.split('/file/d/')[1].split('/')[0].split('?')[0];
-          return `https://docs.google.com/uc?export=view&id=${id}`;
-        } catch (e) { return url; }
+          
+          // USAMOS EL SERVIDOR LH3 (Es el más rápido para mostrar fotos de Drive)
+          // Asegúrate de que se vea exactamente así: ${id}
+          return `https://lh3.googleusercontent.com/d/${id}`;
+        } catch (e) { 
+          return url; 
+        }
       }
       return url;
     };
@@ -631,6 +637,7 @@
   </script>
 </body>
 </html>
+
 
 
 
