@@ -14,11 +14,11 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, query, orderBy, where, increment, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
 
-    window.Firebase = { initializeApp, getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, query, orderBy, where, increment, setDoc, getDoc, getAnalytics };
+    window.Firebase = { initializeApp, getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, signInWithCustomToken, signInAnonymously, getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, query, orderBy, where, increment, setDoc, getDoc, getAnalytics };
   </script>
 
   <script>
@@ -32,9 +32,16 @@
             'float': 'float 6s ease-in-out infinite',
             'float-delayed': 'float 6s ease-in-out 3s infinite',
             'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'shimmer': 'shimmer 2s infinite linear',
+            'fly-up': 'fly-up 2s ease-out forwards',
           },
           keyframes: {
-            float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-20px)' } }
+            float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-20px)' } },
+            shimmer: { '0%': { opacity: 0.5 }, '50%': { opacity: 1 }, '100%': { opacity: 0.5 } },
+            'fly-up': {
+              '0%': { transform: 'translateY(0) scale(0.5)', opacity: '1' },
+              '100%': { transform: 'translateY(-400px) scale(1.8)', opacity: '0' }
+            }
           }
         }
       }
@@ -73,8 +80,9 @@
     .ticker-item { display: inline-block; padding: 0 4rem; } 
     @keyframes ticker { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-100%, 0, 0); } }
     .icon-glow { filter: drop-shadow(0 0 8px rgba(0, 85, 184, 0.4)); }
-    .kiosk-mode { position: fixed; inset: 0; z-index: 9999; background: #0f172a; padding: 0 !important; display: flex; align-items: center; justify-content: center; }
-    .kiosk-mode .glass-premium { max-width: 100%; width: 100%; height: 100%; border-radius: 0; }
+    .kiosk-mode { position: fixed; inset: 0; z-index: 9999; background: #0f172a; padding: 0 !important; display: flex; align-items: center; justify-content: center; width: 100vw; height: 100vh; }
+    .kiosk-mode .glass-premium { max-width: 100% !important; width: 100% !important; height: 100% !important; border-radius: 0; border: none; }
+    .floating-emoji { pointer-events: none; position: absolute; bottom: 150px; right: 50px; font-size: 2.5rem; z-index: 60; }
   </style>
 </head>
 <body>
@@ -83,25 +91,37 @@
 
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'avisos-app-prod';
+
+    // --- UTILS ---
+    const isNewNotice = (timestamp) => {
+        if (!timestamp) return false;
+        const now = new Date();
+        const created = new Date(Number(timestamp));
+        let businessDaysCount = 0;
+        let tempDate = new Date(created);
+        if (now.toDateString() === created.toDateString()) return true;
+        while (tempDate < now) {
+            tempDate.setDate(tempDate.getDate() + 1);
+            if (tempDate.getDay() !== 0 && tempDate.getDay() !== 6) businessDaysCount++;
+        }
+        return businessDaysCount <= 2;
+    };
     
     const getDirectImageUrl = (url) => {
       if (!url) return '';
       if (url.includes('drive.google.com') && url.includes('/file/d/')) {
         try {
-          // Extraemos el ID del archivo
           let id = url.split('/file/d/')[1].split('/')[0].split('?')[0];
-          
-          // USAMOS EL SERVIDOR LH3 (Es el más rápido para mostrar fotos de Drive)
-          // Asegúrate de que se vea exactamente así: ${id}
           return `https://lh3.googleusercontent.com/d/${id}`;
-        } catch (e) { 
-          return url; 
-        }
+        } catch (e) { return url; }
       }
       return url;
     };
 
-    const IconWrapper = ({ children, size = 24, className = "" }) => React.cloneElement(children, { width: size, height: size, className, style: { minWidth: size, minHeight: size } });
+    const IconWrapper = ({ children, size = 24, className = "", ...props }) => React.cloneElement(children, { width: size, height: size, className, ...props, style: { minWidth: size, minHeight: size, ...props.style } });
+    
     const Icons = {
       Menu: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg></IconWrapper>,
       X: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 18 12"/></svg></IconWrapper>,
@@ -115,49 +135,45 @@
       Save: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></IconWrapper>,
       Plus: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></IconWrapper>,
       Clock: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></IconWrapper>,
-      Key: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></IconWrapper>,
       Monitor: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg></IconWrapper>,
       EyeOff: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg></IconWrapper>,
       Eye: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></IconWrapper>,
-      Link: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></IconWrapper>,
       Pin: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg></IconWrapper>,
-      File: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg></IconWrapper>,
-      Smartphone: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg></IconWrapper>,
-      Info: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></IconWrapper>,
-      Alert: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg></IconWrapper>,
+      List: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></IconWrapper>,
+      ThumbsUp: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg></IconWrapper>,
+      ThumbsDown: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"/></svg></IconWrapper>,
+      Info: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></IconWrapper>,
+      Alert: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></IconWrapper>,
       Check: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg></IconWrapper>,
-      Megaphone: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg></IconWrapper>,
-      Calendar: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg></IconWrapper>,
-      Users: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></IconWrapper>,
-      Trophy: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg></IconWrapper>,
+      Smartphone: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></IconWrapper>,
+      Megaphone: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18.8 6c.4 0 .8.2 1 .5.2.3.2.7.2 1.1l-1.6 4.4c0 .4-.4.8-.8.8H15V6h3.8zM3 11l12-5v12L3 14v-3z"/></svg></IconWrapper>,
       Zap: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></IconWrapper>,
-      Image: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></IconWrapper>
+      Image: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></IconWrapper>,
+      Calendar: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></IconWrapper>,
+      Users: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></IconWrapper>,
+      Trophy: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg></IconWrapper>,
+      File: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></IconWrapper>,
+      Link: (p) => <IconWrapper {...p}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></IconWrapper>
     };
-    const SELECTABLE_ICONS = ['Info', 'Alert', 'Check', 'Smartphone', 'Megaphone', 'Calendar', 'Users', 'Trophy', 'Zap', 'Image', 'File', 'Link'];
 
     // --- FIREBASE INIT ---
-    let app, auth, db;
-    let appId = 'avisos-app-prod'; 
+    const { initializeApp, getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, signInWithCustomToken, signInAnonymously, getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, query, orderBy, where, increment, setDoc, getDoc } = window.Firebase;
+
     const firebaseConfig = {
       apiKey: "AIzaSyCA-8vF5IzlaZ3gGQ7Qz2hOikalfY707zk",
       authDomain: "avisosafore.firebaseapp.com",
       projectId: "avisosafore",
       storageBucket: "avisosafore.firebasestorage.app",
       messagingSenderId: "852949757570",
-      appId: "1:852949757570:web:5f4c6de3f62194d8a9ce9b",
-      measurementId: "G-C269SHQYB0"
+      appId: "1:852949757570:web:5f4c6de3f62194d8a9ce9b"
     };
-    
-    try {
-      app = window.Firebase.initializeApp(firebaseConfig);
-      auth = window.Firebase.getAuth(app);
-      db = window.Firebase.getFirestore(app);
-      const analytics = window.Firebase.getAnalytics(app);
-    } catch(e) { console.error("Firebase Init Error:", e); }
 
-    const { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, query, orderBy, where, increment, setDoc, getDoc, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } = window.Firebase;
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
 
-    // --- MAIN APP ---
+    // --- MAIN COMPONENTS ---
+
     function App() {
       const [user, setUser] = useState(null);
       const [authLoading, setAuthLoading] = useState(true);
@@ -165,6 +181,16 @@
       const [kioskMode, setKioskMode] = useState(false);
       
       useEffect(() => {
+        const initAuth = async () => {
+          try {
+            // Regla 3: Autenticación inicial robusta para ambiente sandbox
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+              try { await signInWithCustomToken(auth, __initial_auth_token); } catch (e) { await signInAnonymously(auth); }
+            } else { await signInAnonymously(auth); }
+          } catch (e) { }
+        };
+        initAuth();
+
         const unsubscribe = onAuthStateChanged(auth, async (u) => {
           if (u) {
             try {
@@ -173,32 +199,26 @@
                const SUPER_ADMIN_EMAIL = 'aforegap568@gmail.com'; 
                
                if (u.email === SUPER_ADMIN_EMAIL) {
-                   setUser({ ...u, role: 'admin', name: u.displayName || 'Admin', area: 'Sistemas' });
+                   setUser({ uid: u.uid, email: u.email, role: 'admin', name: u.displayName || 'Admin', area: 'Sistemas' });
                    setView('dashboard');
                } else {
                    if (!docSnap.exists()) {
-                       await setDoc(docRef, {
-                           uid: u.uid,
-                           name: u.displayName || 'Usuario por Sincronizar',
-                           email: u.email,
-                           empId: 'S/N',
-                           area: 'PENDIENTE',
-                           status: 'pending',
-                           date: new Date().toISOString()
-                       });
-                       alert('Tu solicitud se ha sincronizado. Espera la aprobación del administrador.', 'info');
-                       await signOut(auth);
+                       if (u.email) {
+                           await setDoc(docRef, { uid: u.uid, name: u.displayName || 'Usuario por Sincronizar', email: u.email, empId: 'S/N', area: 'PENDIENTE', status: 'pending', date: new Date().toISOString() });
+                           alert('Sincronizando perfil corporativo...', 'info');
+                           await signOut(auth);
+                       } else { setView('login'); }
                    } else if (docSnap.data().status === 'approved') {
-                       setUser({ ...u, role: 'user', ...docSnap.data() });
+                       setUser({ uid: u.uid, email: u.email, role: 'user', ...docSnap.data() });
                        setView('dashboard');
                    } else {
-                       alert('Tu cuenta está en revisión. Contacta al administrador.', 'error');
+                       alert('Tu cuenta está en revisión corporativa.', 'error');
                        await signOut(auth);
                        setUser(null);
                        setView('login');
                    }
                }
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error("Profile sync fail:", e); }
           } else {
             setUser(null);
             setView('login');
@@ -208,70 +228,49 @@
         return () => unsubscribe();
       }, []);
 
-      const handleLogin = async (email, pass) => {
-        try { await signInWithEmailAndPassword(auth, email, pass); } catch (e) { alert('Error: ' + e.message, 'error'); throw e; }
+      const toggleKiosk = async (active) => {
+          if (active) {
+              try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch (err) {}
+              setKioskMode(true);
+          } else {
+              if (document.fullscreenElement) try { document.exitFullscreen(); } catch(e) {}
+              setKioskMode(false);
+          }
       };
 
-      const handleRegister = async (data) => {
-        try {
-            const userCred = await createUserWithEmailAndPassword(auth, data.email, data.password);
-            const uid = userCred.user.uid;
-            await updateProfile(userCred.user, { displayName: data.name });
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', uid), {
-                uid: uid, name: data.name, empId: data.empId, area: data.area, email: data.email, date: new Date().toISOString(), status: 'pending'
-            });
-            alert('Solicitud enviada.', 'success');
-            await signOut(auth); setView('login');
-        } catch (e) { alert('Error al registrar: ' + e.message, 'error'); }
-      };
-
-      const handleLogout = async () => { await signOut(auth); setKioskMode(false); };
-
-      if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold animate-pulse">Cargando Plataforma...</div>;
-      if (view === 'login') return <LoginScreen onLogin={handleLogin} onRegister={() => setView('register')} />;
-      if (view === 'register') return <RegisterScreen onBack={() => setView('login')} onSubmit={handleRegister} />;
-      return <Dashboard user={user} onLogout={handleLogout} kioskMode={kioskMode} setKioskMode={setKioskMode} />;
+      if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white font-bold animate-pulse text-center p-4">Cargando Plataforma AvisosAfore...</div>;
+      if (view === 'login') return <LoginScreen onLogin={async (e, p) => { await signInWithEmailAndPassword(auth, e, p); }} onRegister={() => setView('register')} />;
+      if (view === 'register') return <RegisterScreen onBack={() => setView('login')} onSubmit={async (data) => {
+          try {
+              const uC = await createUserWithEmailAndPassword(auth, data.email, data.password);
+              await updateProfile(uC.user, { displayName: data.name });
+              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', uC.user.uid), { uid: uC.user.uid, name: data.name, empId: data.empId, area: data.area, email: data.email, date: new Date().toISOString(), status: 'pending' });
+              alert('Solicitud enviada correctamente.', 'success');
+              await signOut(auth); setView('login');
+          } catch (e) { alert(e.message, 'error'); }
+      }} />;
+      return <Dashboard user={user} onLogout={async () => { await signOut(auth); setKioskMode(false); }} kioskMode={kioskMode} setKioskMode={toggleKiosk} />;
     }
 
-    // --- SCREENS ---
     function LoginScreen({ onLogin, onRegister }) {
       const [email, setEmail] = useState('');
       const [pass, setPass] = useState('');
       const [showPass, setShowPass] = useState(false);
       const [isLoading, setIsLoading] = useState(false);
-      const handleLoginClick = async () => {
-          if (!email || !pass) return alert("Por favor ingresa usuario y contraseña.");
-          setIsLoading(true);
-          try { await onLogin(email, pass); } catch (e) { setIsLoading(false); }
-      };
       return (
         <div className="min-h-screen flex items-center justify-center p-6">
-          <div className="glass-premium p-8 rounded-[40px] w-full max-w-md animate-in relative overflow-hidden">
-            <div className="text-center mb-6 flex flex-col items-center">
-              <img src="logoafore.png" alt="Logotipo Afore Coppel" className="h-24 mb-4 object-contain" />
-              <p className="text-slate-500 font-medium mt-2">Plataforma de Avisos Afore Coppel</p>
+          <div className="glass-premium p-8 rounded-[40px] w-full max-w-md animate-in relative overflow-hidden text-center">
+            <div className="mb-6 flex flex-col items-center">
+              <img src="logoafore.png" alt="Logotipo Afore Coppel" className="h-24 mb-4 object-contain" onError={(e)=>e.target.style.display='none'} />
+              <p className="text-slate-500 font-bold text-lg leading-tight uppercase tracking-tight">Plataforma de Avisos Afore Coppel</p>
               <p className="text-slate-400 text-xs mt-1">¡Hola de nuevo! Ingresa tus credenciales.</p>
             </div>
-            <div className="space-y-4">
-              <div className="relative"><div className="absolute left-4 top-3.5 text-slate-400"><Icons.User size={18}/></div><input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-2xl outline-none" placeholder="usuario@coppel.com" disabled={isLoading} /></div>
-              <div className="relative">
-                <div className="absolute left-4 top-3.5 text-slate-400"><Icons.Key size={18}/></div>
-                <input type={showPass ? "text" : "password"} value={pass} onChange={e=>setPass(e.target.value)} className="w-full pl-12 pr-12 py-3 bg-slate-50 border rounded-2xl outline-none" placeholder="••••••" disabled={isLoading} />
-                <button onClick={() => setShowPass(!showPass)} className="absolute right-4 top-3.5 text-slate-400 hover:text-coppel-blue transition-colors" tabIndex="-1">{showPass ? <Icons.EyeOff size={18}/> : <Icons.Eye size={18}/>}</button>
-              </div>
-              <button onClick={handleLoginClick} disabled={isLoading} className={`w-full font-bold py-4 rounded-2xl shadow-xl transition-all mt-2 flex justify-center items-center gap-2 ${isLoading ? 'bg-slate-400 cursor-not-allowed' : 'bg-gradient-to-r from-coppel-blue to-coppel-dark hover:brightness-110 transform active:scale-95 text-white'}`}>
-                {isLoading ? (
-                    <>
-                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span>VALIDANDO...</span>
-                    </>
-                ) : 'INICIAR SESIÓN'}
-              </button>
+            <div className="space-y-4 text-left">
+              <div className="relative"><div className="absolute left-4 top-3.5 text-slate-400"><Icons.User size={18}/></div><input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-2xl outline-none" placeholder="usuario@coppel.com" /></div>
+              <div className="relative"><div className="absolute left-4 top-3.5 text-slate-400"><Icons.Key size={18}/></div><input type={showPass ? "text" : "password"} value={pass} onChange={e=>setPass(e.target.value)} className="w-full pl-12 pr-12 py-3 bg-slate-50 border rounded-2xl outline-none" placeholder="••••••" /><button onClick={() => setShowPass(!showPass)} className="absolute right-4 top-3.5 text-slate-400 hover:text-coppel-blue transition-colors">{showPass ? <Icons.EyeOff size={18}/> : <Icons.Eye size={18}/>}</button></div>
+              <button onClick={async () => { setIsLoading(true); try { await onLogin(email, pass); } catch(e) { alert(e.message, 'error'); setIsLoading(false); } }} disabled={isLoading} className={`w-full font-bold py-4 rounded-2xl shadow-xl transition-all mt-2 flex justify-center items-center gap-2 ${isLoading ? 'bg-slate-400' : 'bg-gradient-to-r from-coppel-blue to-coppel-dark text-white hover:brightness-110 active:scale-95'}`}>{isLoading ? 'VALIDANDO...' : 'INICIAR SESIÓN'}</button>
             </div>
-            <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col items-center gap-4">
-              <button onClick={onRegister} className="text-sm font-bold text-coppel-blue hover:underline">Solicitar Acceso</button>
-              <div className="text-center mt-4"><p className="text-sm text-slate-400 font-bold uppercase tracking-widest">HERRAMIENTA GENERADA POR GAP</p></div>
-            </div>
+            <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col items-center gap-4"><button onClick={onRegister} className="text-sm font-bold text-coppel-blue hover:underline">Solicitar Acceso</button><div className="text-center mt-4 text-[10px] text-slate-400 font-bold tracking-widest uppercase">HERRAMIENTA GENERADA POR GAP</div></div>
           </div>
         </div>
       );
@@ -279,24 +278,19 @@
 
     function RegisterScreen({ onBack, onSubmit }) {
       const [form, setForm] = useState({ name: '', empId: '', area: '', email: '', password: '' });
-      const handleChange = (f, v) => setForm({...form, [f]: v});
-      const handleSubmit = () => {
-         if(!form.name || !form.empId || !form.area || !form.email || !form.password) return alert("Completa todos los campos.", 'error');
-         onSubmit(form);
-      };
       return (
          <div className="min-h-screen flex items-center justify-center p-6">
-          <div className="glass-premium p-10 rounded-[40px] w-full max-w-lg animate-in">
-            <h2 className="font-heading text-2xl font-black text-coppel-dark mb-6 text-center">Solicitud de Acceso</h2>
+          <div className="glass-premium p-10 rounded-[40px] w-full max-w-lg animate-in text-left">
+            <h2 className="font-heading text-2xl font-black text-coppel-dark mb-6 text-center uppercase tracking-tighter">Solicitud de Acceso</h2>
             <div className="space-y-3">
                <div className="grid grid-cols-2 gap-3">
-                  <div className="relative"><label className="text-[10px] font-bold text-slate-400 uppercase ml-2">Nombre Completo</label><input value={form.name} onChange={e=>handleChange('name', e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl outline-none" placeholder="Nombre Apellido" /></div>
-                  <div className="relative"><label className="text-[10px] font-bold text-slate-400 uppercase ml-2">No. Empleado</label><input value={form.empId} onChange={e=>handleChange('empId', e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl outline-none" placeholder="12345678" /></div>
+                  <div className="relative"><label className="text-[10px] font-bold text-slate-400 uppercase ml-2">Nombre Completo</label><input value={form.name} onChange={e=>setForm({...form, name: e.target.value})} className="w-full p-3 bg-slate-50 border rounded-xl outline-none" placeholder="Nombre Apellido" /></div>
+                  <div className="relative"><label className="text-[10px] font-bold text-slate-400 uppercase ml-2">No. Empleado</label><input value={form.empId} onChange={e=>setForm({...form, empId: e.target.value})} className="w-full p-3 bg-slate-50 border rounded-xl outline-none" placeholder="12345678" /></div>
                </div>
-               <div><label className="text-[10px] font-bold text-slate-400 uppercase ml-2">Área</label><select value={form.area} onChange={e=>handleChange('area', e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl outline-none text-slate-700"><option value="">Seleccionar Área...</option><option value="MSO">MSO</option><option value="CAT">CAT</option><option value="GAP">GAP</option><option value="UNE">UNE</option></select></div>
-               <div><label className="text-[10px] font-bold text-slate-400 uppercase ml-2">Correo Corporativo</label><input type="email" value={form.email} onChange={e=>handleChange('email', e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl outline-none" placeholder="usuario@coppel.com" /></div>
-               <div><label className="text-[10px] font-bold text-slate-400 uppercase ml-2">Contraseña</label><input type="password" value={form.password} onChange={e=>handleChange('password', e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl outline-none" /></div>
-               <div className="pt-4 flex gap-3"><button onClick={onBack} className="flex-1 py-3 rounded-xl border border-slate-300 text-slate-500 font-bold hover:bg-slate-50">Cancelar</button><button onClick={handleSubmit} className="flex-1 py-3 rounded-xl bg-coppel-yellow text-coppel-dark font-bold hover:brightness-110 shadow-lg">Enviar Solicitud</button></div>
+               <div><label className="text-[10px] font-bold text-slate-400 uppercase ml-2">Área</label><select value={form.area} onChange={e=>setForm({...form, area: e.target.value})} className="w-full p-3 bg-slate-50 border rounded-xl outline-none text-slate-700 font-medium"><option value="">Seleccionar Área...</option><option value="MSO">MSO</option><option value="CAT">CAT</option><option value="GAP">GAP</option><option value="UNE">UNE</option></select></div>
+               <div><label className="text-[10px] font-bold text-slate-400 uppercase ml-2">Correo Corporativo</label><input type="email" value={form.email} onChange={e=>setForm({...form, email: e.target.value})} className="w-full p-3 bg-slate-50 border rounded-xl outline-none" placeholder="usuario@coppel.com" /></div>
+               <div><label className="text-[10px] font-bold text-slate-400 uppercase ml-2">Contraseña</label><input type="password" value={form.password} onChange={e=>setForm({...form, password: e.target.value})} className="w-full p-3 bg-slate-50 border rounded-xl outline-none" /></div>
+               <div className="pt-4 flex gap-3"><button onClick={onBack} className="flex-1 py-3 rounded-xl border border-slate-300 text-slate-500 font-bold hover:bg-slate-50 transition-colors uppercase text-xs">Cancelar</button><button onClick={() => onSubmit(form)} className="flex-1 py-3 rounded-xl bg-coppel-yellow text-coppel-dark font-bold hover:brightness-110 shadow-lg transition-all active:scale-95 uppercase text-xs">Enviar Solicitud</button></div>
             </div>
           </div>
          </div>
@@ -310,122 +304,112 @@
       const [showAdmin, setShowAdmin] = useState(false);
       const [searchTerm, setSearchTerm] = useState('');
       const [filterType, setFilterType] = useState('all'); 
+      const [viewersModalNotice, setViewersModalNotice] = useState(null);
 
       useEffect(() => {
           if (!user) return;
-          const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'notices')); 
-          const unsub = onSnapshot(q, (snapshot) => {
+          // Regla 2: Fetch simple y filtrar/ordenar en memoria JS
+          const unsub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'notices'), (snapshot) => {
               const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
               data.sort((a, b) => b.id - a.id); 
               setNotices(data);
-          });
+          }, (err) => console.log("Notices listener awaiting permission..."));
           return () => unsub();
       }, [user]);
 
       useEffect(() => {
         if (!user || user.role !== 'admin') return;
-        const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'profiles'), where('status', '==', 'pending'));
-        const unsub = onSnapshot(q, (snapshot) => {
+        const unsub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'profiles'), (snapshot) => {
             const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-            setRequests(data);
-        });
+            setRequests(data.filter(p => p.status === 'pending'));
+        }, (err) => console.log("Requests listener awaiting permission..."));
         return () => unsub();
       }, [user]);
 
-      const visibleNotices = notices.filter(n => user.role === 'admin' || n.active);
-      const pinnedNotice = visibleNotices.find(n => n.pinned);
-      const defaultNotice = pinnedNotice || visibleNotices[0]; 
+      const visibleNotices = notices.filter(n => user?.role === 'admin' || n.active);
+      const defaultNotice = visibleNotices.find(n => n.pinned) || visibleNotices[0]; 
       const activeNotice = activeNoticeId ? (visibleNotices.find(n => n.id === activeNoticeId) || defaultNotice) : defaultNotice;
 
       useEffect(() => {
-         if(activeNotice && user.role !== 'admin' && !kioskMode && activeNotice.id) {
-             const timer = setTimeout(() => {
-                 updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notices', String(activeNotice.id)), { views: increment(1) }).catch(e=>console.log(e));
+         if(activeNotice && user && user.role !== 'admin' && !kioskMode && activeNotice.id) {
+             const timer = setTimeout(async () => {
+                 const vId = `${activeNotice.id}_${user.uid}`;
+                 const viewerRef = doc(db, 'artifacts', appId, 'public', 'data', 'viewers', vId);
+                 try {
+                     const viewerSnap = await getDoc(viewerRef);
+                     if (!viewerSnap.exists()) {
+                         await setDoc(viewerRef, { noticeId: String(activeNotice.id), uid: user.uid, date: new Date().toISOString(), name: user.name, area: user.area });
+                         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notices', String(activeNotice.id)), { views: increment(1) });
+                     }
+                 } catch(e) {}
              }, 3000); 
              return () => clearTimeout(timer);
          }
-      }, [activeNotice?.id]);
+      }, [activeNotice?.id, user?.uid]);
 
-      const filteredNotices = visibleNotices.filter(n => {
-        const matchesSearch = n.title?.toLowerCase().includes(searchTerm.toLowerCase()) || n.subtitle?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesType = filterType === 'all' || n.type === filterType;
-        return matchesSearch && matchesType;
-      });
-
-      const handleTogglePin = async (id) => {
-          const current = notices.find(n => n.id === id);
-          if(!current) return;
-          const othersPinned = notices.filter(n => n.pinned && n.id !== id);
-          for (const n of othersPinned) {
-              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notices', String(n.id)), { pinned: false });
-          }
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notices', String(id)), { pinned: !current.pinned });
-      };
-
-      const filterLabels = { all: 'Todos', info: 'Info', urgent: 'Urgente', congrats: 'Logro' };
+      const filteredNotices = visibleNotices.filter(n => (n.title?.toLowerCase().includes(searchTerm.toLowerCase()) || n.subtitle?.toLowerCase().includes(searchTerm.toLowerCase())) && (filterType === 'all' || n.type === filterType));
 
       return (
-        <div className="min-h-screen flex flex-col">
+        <div className={`min-h-screen flex flex-col ${kioskMode ? 'kiosk-mode' : ''}`}>
           {!kioskMode && (
-            <nav className="sticky top-0 w-full z-50 glass-dark px-8 py-4 flex justify-between items-center shadow-2xl backdrop-blur-xl border-b border-white/10">
+            <nav className="sticky top-0 w-full z-50 glass-dark px-8 py-4 flex justify-between items-center shadow-2xl border-b border-white/10 uppercase font-black">
                 <div className="flex items-center gap-4">
-                <div className="font-heading font-black italic text-2xl tracking-tighter text-white">AVISOS<span className="text-coppel-yellow">AFORE</span></div>
+                <div className="font-heading italic text-2xl tracking-tighter text-white">AVISOS<span className="text-coppel-yellow">AFORE</span></div>
                 <div className="h-8 w-px bg-white/20 mx-2"></div>
                 <div className="flex items-center gap-3 bg-white/10 px-4 py-2 rounded-full border border-white/5">
                     <div className="bg-coppel-yellow p-1.5 rounded-full"><Icons.User size={16} className="text-coppel-dark"/></div>
-                    <div className="leading-tight"><div className="font-bold text-sm text-white">{user.name}</div><div className="text-[10px] text-white/70 uppercase tracking-widest">{user.area} • {user.role === 'admin' ? 'ADMIN' : 'USER'}</div></div>
+                    <div className="leading-tight text-left"><div className="font-bold text-sm text-white">{user?.name || 'Iniciando...'}</div><div className="text-[10px] text-white/70 tracking-widest">{user?.area || 'Corporativo'} • {user?.role === 'admin' ? 'ADMIN' : 'USER'}</div></div>
                 </div>
                 </div>
                 <div className="flex gap-3">
                 <button onClick={() => setKioskMode(true)} className="bg-white/10 hover:bg-coppel-blue text-white p-3 rounded-full transition-all flex items-center gap-2 group" title="Modo Kiosco"><Icons.Monitor size={20} className="group-hover:scale-110 transition-transform"/></button>
-                {user.role === 'admin' && (
+                {user?.role === 'admin' && (
                     <button onClick={() => setShowAdmin(true)} className="bg-coppel-blue hover:bg-blue-600 text-white px-6 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-2 shadow-lg shadow-blue-900/50">
-                    <Icons.Edit size={16}/> PANEL DE CONTROL {requests.length > 0 && <span className="bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full animate-pulse">{requests.length}</span>}
+                    <Icons.Edit size={16}/> PANEL DE CONTROL {requests?.length > 0 && <span className="bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full animate-pulse font-bold">{requests.length}</span>}
                     </button>
                 )}
-                <button onClick={onLogout} className="bg-red-500/10 hover:bg-red-500 text-red-200 hover:text-white p-3 rounded-full transition-all"><Icons.LogOut size={20}/></button>
+                <button onClick={onLogout} className="bg-red-500/10 hover:bg-red-500 text-red-200 hover:text-white p-3 rounded-full transition-all active:scale-90"><Icons.LogOut size={20}/></button>
                 </div>
             </nav>
           )}
 
-          <main className={`flex-1 w-full flex flex-col gap-8 ${kioskMode ? 'kiosk-mode' : 'max-w-7xl mx-auto p-8'}`}>
+          <main className={`flex-1 w-full flex flex-col gap-8 ${kioskMode ? 'p-0' : 'max-w-7xl mx-auto p-8'}`}>
             <section className={`w-full flex justify-center transition-all ${kioskMode ? 'h-full w-full' : ''}`}>
-               {activeNotice ? ( <NextGenViewer data={activeNotice} kioskMode={kioskMode} onExitKiosk={() => setKioskMode(false)} /> ) : ( <div className="text-white text-center py-20 flex flex-col items-center opacity-50"><Icons.Info size={48}/><span className="mt-4">No hay avisos disponibles.</span></div> )}
+               {activeNotice ? ( <NextGenViewer user={user} data={activeNotice} kioskMode={kioskMode} onExitKiosk={() => setKioskMode(false)} /> ) : ( <div className="text-white text-center py-20 flex flex-col items-center opacity-50"><Icons.Info size={48}/><span className="mt-4 font-bold uppercase tracking-widest text-sm italic">Sin avisos disponibles en el canal corporativo.</span></div> )}
             </section>
             
             {!kioskMode && (
-                <section className="glass-premium rounded-[32px] p-8 animate-in" style={{animationDelay: '0.2s'}}>
+                <section className="glass-premium rounded-[32px] p-8 animate-in text-left" style={{animationDelay: '0.2s'}}>
                 <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                    <h3 className="text-slate-800 font-bold text-lg flex items-center gap-2"><span className="bg-blue-100 p-2 rounded-xl text-[#0055B8]"><Icons.Clock size={20}/></span> Historial de Avisos</h3>
+                    <h3 className="text-slate-800 font-bold text-lg flex items-center gap-2 tracking-tight uppercase"><span className="bg-blue-100 p-2 rounded-xl text-[#0055B8]"><Icons.Clock size={20}/></span> Historial de Comunicación</h3>
                     <div className="flex flex-col md:flex-row gap-4 items-center w-full md:w-auto">
                     <div className="flex bg-slate-100 p-1 rounded-xl">
-                        {['all', 'info', 'urgent', 'congrats'].map(t => (<button key={t} onClick={() => setFilterType(t)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all uppercase ${filterType === t ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}>{filterLabels[t]}</button>))}
+                        {['all', 'info', 'urgent', 'congrats'].map(t => (<button key={t} onClick={() => setFilterType(t)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all uppercase ${filterType === t ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}>{t === 'all' ? 'Todos' : t === 'info' ? 'Info' : t === 'urgent' ? 'Urgente' : 'Logro'}</button>))}
                     </div>
-                    <div className="relative w-full md:w-64"><input className="w-full pl-9 pr-4 py-2 bg-white/50 border border-white rounded-xl text-xs outline-none focus:ring-2 focus:ring-coppel-blue/50 transition-all" placeholder="Buscar avisos..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /><div className="absolute left-3 top-2.5 text-slate-400"><Icons.Search size={14}/></div></div>
+                    <div className="relative w-full md:w-64"><input className="w-full pl-9 pr-4 py-2 bg-white/50 border border-white rounded-xl text-xs outline-none focus:ring-2 focus:ring-coppel-blue/50 transition-all font-bold" placeholder="Buscar avisos..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /><div className="absolute left-3 top-2.5 text-slate-400"><Icons.Search size={14}/></div></div>
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
-                    {filteredNotices.map(notice => (
+                    {filteredNotices?.map(notice => (
                         <div key={notice.id} className={`group relative bg-white/90 backdrop-blur-sm rounded-xl border border-white shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer overflow-hidden ${activeNoticeId === notice.id ? 'ring-2 ring-coppel-blue/50' : ''}`} onClick={() => setActiveNoticeId(notice.id)}>
                             <div className={`absolute left-0 top-0 bottom-0 w-1 ${notice.type === 'urgent' ? 'bg-red-500' : notice.type === 'congrats' ? 'bg-green-500' : 'bg-coppel-blue'}`}></div>
                             <div className="p-4 pl-5">
                                 <div className="flex justify-between items-start mb-1">
-                                    <div className="flex gap-2 items-center"><span className={`text-[9px] font-bold uppercase tracking-wider py-0.5 px-1.5 rounded-md bg-slate-100 text-slate-500`}>{notice.type}</span>{notice.pinned && <span className="text-[9px] font-bold uppercase tracking-wider py-0.5 px-1.5 rounded-md bg-yellow-100 text-yellow-700 flex items-center gap-1"><Icons.Pin size={8}/> FIJO</span>}</div>
-                                    <span className="text-[9px] font-bold text-slate-400">{notice.date}</span>
+                                    <div className="flex gap-2 items-center"><span className={`text-[9px] font-bold uppercase tracking-wider py-0.5 px-1.5 rounded-md bg-slate-100 text-slate-500`}>{notice.type}</span>{notice.pinned && <span className="text-[9px] font-bold uppercase tracking-wider py-0.5 px-1.5 rounded-md bg-yellow-100 text-yellow-700 flex items-center gap-1 font-black"><Icons.Pin size={8}/> FIJO</span>}{isNewNotice(notice.id) && <span className="text-[9px] font-bold uppercase tracking-wider py-0.5 px-1.5 rounded-md bg-blue-600 text-white animate-pulse flex items-center gap-1 font-black">✨ NUEVO</span>}</div>
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase">{notice.date}</span>
                                 </div>
-                                <h4 className="font-bold text-slate-800 text-sm mb-0.5 line-clamp-1 group-hover:text-coppel-blue transition-colors">{notice.title}</h4>
-                                <p className="text-[10px] text-slate-500 line-clamp-2 leading-relaxed mb-2">{notice.subtitle}</p>
+                                <h4 className="font-bold text-slate-800 text-sm mb-0.5 line-clamp-1 group-hover:text-coppel-blue transition-colors uppercase tracking-tight">{notice.title}</h4>
+                                <p className="text-[10px] text-slate-500 line-clamp-2 leading-relaxed mb-2 font-medium">{notice.subtitle}</p>
                                 <div className="flex justify-between items-center pt-2 border-t border-slate-100/50">
-                                    {user.role === 'admin' ? (<div className="flex items-center gap-1 text-[9px] font-bold text-slate-400"><Icons.Eye size={10}/> {notice.views || 0}</div>) : <div></div>}
+                                    {user?.role === 'admin' ? (
+                                        <div className="flex items-center gap-2">
+                                          <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400"><Icons.Eye size={10}/> {notice.views || 0}</div>
+                                          <button onClick={(e) => { e.stopPropagation(); setViewersModalNotice(notice); }} className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-coppel-blue transition-colors" title="Visualizaciones"><Icons.List size={12}/></button>
+                                        </div>
+                                    ) : <div></div>}
                                     {!notice.active && <span className="text-[9px] font-bold text-red-400 uppercase flex items-center gap-1"><Icons.EyeOff size={10}/> Oculto</span>}
                                 </div>
                             </div>
-                            {user.role === 'admin' && (
-                                <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                    <button onClick={(e) => { e.stopPropagation(); handleTogglePin(notice.id); }} className={`shadow-sm border p-1 rounded-md transition-all ${notice.pinned ? 'bg-yellow-100 text-yellow-600 border-yellow-200' : 'bg-white text-slate-300 hover:text-yellow-500'}`} title={notice.pinned ? "Desfijar" : "Fijar al inicio"}><Icons.Pin size={12}/></button>
-                                    <button onClick={(e) => { e.stopPropagation(); updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notices', String(notice.id)), { active: !notice.active }); }} className="bg-white shadow-sm border p-1 rounded-md text-slate-300 hover:text-coppel-blue" title={notice.active ? "Ocultar" : "Mostrar"}>{notice.active ? <Icons.EyeOff size={12}/> : <Icons.Eye size={12}/>}</button>
-                                </div>
-                            )}
                         </div>
                     ))}
                 </div>
@@ -433,157 +417,245 @@
             )}
           </main>
           {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} activeNotice={activeNotice} requests={requests} />}
+          {viewersModalNotice && <ViewersModal notice={viewersModalNotice} onClose={() => setViewersModalNotice(null)} />}
         </div>
       );
     }
 
-    function NextGenViewer({ data, kioskMode, onExitKiosk }) {
+    function ViewersModal({ notice, onClose }) {
+      const [viewers, setViewers] = useState([]);
+      const [reactions, setReactions] = useState({});
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        const fetchAll = async () => {
+          if (!notice?.id) return;
+          try {
+            // Regla 2: Fetch plano y filtrar en memoria JS para evitar problemas de índices y permisos
+            const vSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'viewers'));
+            setViewers(vSnap.docs.map(d => d.data()).filter(v => v.noticeId === String(notice.id)));
+            
+            const rSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'reactions'));
+            const rMap = {};
+            rSnap.docs.map(d => d.data()).filter(r => r.noticeId === String(notice.id)).forEach(r => { rMap[r.uid] = r.type; });
+            setReactions(rMap);
+          } catch(e) { console.error("Error visualizaciones:", e); }
+          setLoading(false);
+        };
+        fetchAll();
+      }, [notice?.id]);
+
+      const getReactionEmoji = (uid) => {
+          const type = reactions[uid];
+          if (!type) return null;
+          if (type === 'like') return '👍';
+          if (type === 'dislike') return '👎';
+          return type;
+      };
+
+      return (
+        <div className="fixed inset-0 z-[110] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in text-left">
+          <div className="bg-white w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl flex flex-col max-h-[80vh]">
+            <div className="p-6 border-b flex justify-between items-center bg-slate-50">
+              <div><h3 className="font-bold text-slate-800 uppercase tracking-tighter">Lectores Corporativos</h3><p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">Aviso: {notice?.title}</p></div>
+              <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors active:scale-90"><Icons.X size={20}/></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+              {loading ? <div className="py-10 text-center animate-pulse text-slate-400 font-bold uppercase text-[10px] tracking-widest">Sincronizando información...</div> : viewers.length === 0 ? <div className="py-10 text-center text-slate-300 italic font-medium uppercase text-xs">Sin registros de lectura confirmados.</div> : (
+                <div className="space-y-2">
+                  {viewers.map((v, i) => (
+                    <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100 animate-in">
+                      <div className="w-10 h-10 rounded-full bg-coppel-blue/10 flex items-center justify-center text-coppel-blue font-black text-sm uppercase">{v.name?.charAt(0) || 'U'}</div>
+                      <div className="flex-1 leading-tight"><div className="font-bold text-slate-800 text-sm uppercase">{v.name || 'Usuario'}</div><div className="text-[10px] text-slate-400 font-black uppercase">{v.area || 'General'}</div></div>
+                      <div className="flex items-center gap-2">
+                        {getReactionEmoji(v.uid) && <span className="text-xl filter drop-shadow-sm">{getReactionEmoji(v.uid)}</span>}
+                        <div className="text-[9px] text-slate-300 font-black ml-2 uppercase">{v.date ? new Date(v.date).toLocaleDateString() : '-'}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="p-4 bg-slate-50 text-center text-[10px] text-slate-400 font-black border-t tracking-widest uppercase">{viewers.length} VISTAS ÚNICAS</div>
+          </div>
+        </div>
+      );
+    }
+
+    function NextGenViewer({ user, data, kioskMode, onExitKiosk }) {
       const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
       const [progress, setProgress] = useState(0);
       const [isPaused, setIsPaused] = useState(false);
+      const [floatingEmojis, setFloatingEmojis] = useState([]);
       const DURATION = 8000; 
-      const safeIndex = (currentSlideIndex >= 0 && currentSlideIndex < data.slides.length) ? currentSlideIndex : 0;
-      const slide = data.slides[safeIndex] || { title: 'Cargando...', icon: 'Info', type: 'text', content: [] };
-      const SlideIcon = Icons[slide.icon] || Icons.Info;
+      const slides = data?.slides || [{ title: 'Sin contenido', icon: 'Info', type: 'text', content: [] }];
+      const safeIndex = (currentSlideIndex >= 0 && currentSlideIndex < slides.length) ? currentSlideIndex : 0;
+      const slide = slides[safeIndex];
+      const SlideIcon = Icons[slide?.icon] || Icons.Info;
 
-      useEffect(() => { setCurrentSlideIndex(0); setProgress(0); if (data.type === 'congrats' && window.confetti) window.confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 }, colors: ['#FFD200', '#0055B8', '#22c55e'] }); }, [data.id]);
+      useEffect(() => { 
+        setCurrentSlideIndex(0); 
+        setProgress(0); 
+        if (data?.type === 'congrats' && window.confetti) {
+          window.confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 }, colors: ['#FFD200', '#0055B8', '#22c55e'] });
+        }
+      }, [data?.id]);
+      
       useEffect(() => {
-        if (isPaused) return;
+        if (isPaused || !slides.length) return;
         const interval = setInterval(() => {
           setProgress(prev => {
             if (prev >= 100) {
-              if (currentSlideIndex < data.slides.length - 1) { setCurrentSlideIndex(idx => idx + 1); return 0; } else { setCurrentSlideIndex(0); return 0; }
+              if (currentSlideIndex < slides.length - 1) { setCurrentSlideIndex(idx => idx + 1); return 0; } else { setCurrentSlideIndex(0); return 0; }
             }
             return prev + (100 / (DURATION / 50));
           });
         }, 50);
         return () => clearInterval(interval);
-      }, [currentSlideIndex, isPaused, data.slides.length]);
+      }, [currentSlideIndex, isPaused, slides.length]);
+
+      // EFECTO FLY-UP DE REACCIONES REAL-TIME (REGLA 2)
+      useEffect(() => {
+          if (!data?.id || !user) return;
+          const unsub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'reactions'), (snap) => {
+              snap.docChanges().forEach(change => {
+                  if (change.type === "added" || change.type === "modified") {
+                      const rData = change.doc.data();
+                      if (rData.noticeId === String(data.id) && ['❤️', '👋', '👏', '🔥'].includes(rData.type)) {
+                          triggerFlyUp(rData.type);
+                      }
+                  }
+              });
+          }, (err) => console.log("Real-time reactions standby."));
+          return () => unsub();
+      }, [data?.id, user?.uid]);
+
+      const triggerFlyUp = (emoji) => {
+          const id = Math.random().toString(36).substr(2, 9);
+          const leftOffset = Math.floor(Math.random() * 60) + 20; 
+          setFloatingEmojis(prev => [...prev, { id, emoji, left: `${leftOffset}%` }]);
+          setTimeout(() => { setFloatingEmojis(prev => prev.filter(r => r.id !== id)); }, 2000);
+      };
+
+      const handleReaction = async (type) => {
+          if (!user || user.role === 'admin') return;
+          const rId = `${data.id}_${user.uid}`;
+          const reactionRef = doc(db, 'artifacts', appId, 'public', 'data', 'reactions', rId);
+          try {
+              await setDoc(reactionRef, { type, uid: user.uid, noticeId: String(data.id), timestamp: Date.now() });
+          } catch(e) { console.error("Reaction error:", e); }
+      };
 
       return (
-        <div className={`glass-premium relative overflow-hidden flex flex-col shadow-2xl transition-all duration-500 select-none ${kioskMode ? 'w-full h-full rounded-none' : 'rounded-[32px] w-full max-w-4xl min-h-[600px]'}`} onMouseDown={() => setIsPaused(true)} onMouseUp={() => setIsPaused(false)}>
-          <div className="absolute top-0 left-0 w-full p-6 z-20 bg-gradient-to-b from-white via-white/80 to-transparent">
-            <div className="flex gap-2 mb-4">
-              {data.slides.map((_, idx) => (<div key={idx} className="h-1.5 flex-1 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-coppel-blue transition-all duration-75 ease-linear shadow-[0_0_8px_rgba(0,85,184,0.4)]" style={{ width: idx < safeIndex ? '100%' : idx === safeIndex ? `${progress}%` : '0%' }} /></div>))}
+        <div className={`glass-premium relative overflow-hidden flex flex-col shadow-2xl transition-all duration-500 select-none ${kioskMode ? 'w-full h-full rounded-none border-none shadow-none' : 'rounded-[32px] w-full max-w-4xl min-h-[600px]'}`} onMouseDown={() => setIsPaused(true)} onMouseUp={() => setIsPaused(false)}>
+          
+          {floatingEmojis.map(r => (
+              <div key={r.id} className="floating-emoji animate-fly-up" style={{ left: r.left }}>{r.emoji}</div>
+          ))}
+
+          <div className={`absolute top-0 left-0 w-full z-20 bg-gradient-to-b from-white via-white/80 to-transparent ${kioskMode ? 'p-10' : 'p-6'}`}>
+            <div className={`flex gap-2 mb-4 ${kioskMode ? 'mb-8' : ''}`}>
+              {slides.map((_, idx) => (<div key={idx} className={`${kioskMode ? 'h-3' : 'h-1.5'} flex-1 bg-slate-200 rounded-full overflow-hidden`}><div className="h-full bg-coppel-blue transition-all duration-75 ease-linear shadow-[0_0_12px_rgba(0,85,184,0.6)]" style={{ width: idx < safeIndex ? '100%' : idx === safeIndex ? `${progress}%` : '0%' }} /></div>))}
             </div>
-            <div className="flex justify-between items-start">
-              <div className="flex gap-3 items-center">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-lg shadow-sm border border-slate-100 ${data.type === 'urgent' ? 'bg-red-500' : data.type === 'congrats' ? 'bg-green-500' : 'bg-coppel-blue'}`}>{data.type === 'congrats' ? '🎉' : data.type === 'urgent' ? '⚠️' : '📢'}</div>
-                  <div><h2 className="font-heading font-black text-slate-800 text-lg leading-tight uppercase">{data.title}</h2><p className="text-xs font-medium text-slate-500 line-clamp-1">{data.subtitle}</p></div>
-              </div>
-              <div className="flex items-center gap-2">{kioskMode && <button onClick={onExitKiosk} className="bg-black/10 hover:bg-black/20 p-2 rounded-full"><Icons.X size={20}/></button>}</div>
+            <div className="flex justify-between items-start text-left">
+              <div className="flex gap-4 items-center"><div className={`${kioskMode ? 'w-16 h-16 text-3xl' : 'w-10 h-10 text-lg'} rounded-full flex items-center justify-center text-white shadow-sm border border-slate-100 ${data?.type === 'urgent' ? 'bg-red-500' : data?.type === 'congrats' ? 'bg-green-500' : 'bg-coppel-blue'}`}>{data?.type === 'congrats' ? '🎉' : data?.type === 'urgent' ? '⚠️' : '📢'}</div><div><h2 className={`font-heading font-black text-slate-800 leading-tight uppercase ${kioskMode ? 'text-3xl tracking-normal' : 'text-lg'}`}>{data?.title}</h2><p className={`font-medium text-slate-500 line-clamp-1 uppercase ${kioskMode ? 'text-xl mt-1' : 'text-xs'}`}>{data?.subtitle}</p></div></div>
+              <div className="flex items-center gap-2">{kioskMode && <button onClick={onExitKiosk} className="bg-black/10 hover:bg-black/20 p-4 rounded-full text-slate-800 transition-colors active:scale-90"><Icons.X size={32}/></button>}</div>
             </div>
           </div>
-          <div className="flex-1 flex flex-col items-center justify-center p-8 pt-32 relative z-10">
-            <div key={safeIndex} className="w-full max-w-3xl animate-in flex flex-col items-center">
-               <div className="mb-8 p-6 rounded-3xl bg-gradient-to-br from-white to-slate-50 shadow-[0_10px_30px_-5px_rgba(0,85,184,0.2)] text-coppel-blue transform transition hover:scale-105 duration-300 border border-slate-100 icon-glow"><SlideIcon size={64} /></div>
-               <h3 className="text-3xl md:text-5xl font-bold text-slate-800 text-center mb-3 font-heading tracking-tight drop-shadow-sm">{slide.title}</h3>
-               {slide.subtitle && <p className="text-lg md:text-xl text-slate-500 font-medium text-center mb-10 max-w-xl leading-relaxed">{slide.subtitle}</p>}
+
+          <div className={`flex-1 flex flex-col items-center justify-center relative z-10 ${kioskMode ? 'pt-48 px-20' : 'p-8 pt-32'}`}>
+            <div key={safeIndex} className={`w-full animate-in flex flex-col items-center ${kioskMode ? 'max-w-6xl' : 'max-w-3xl'}`}>
+               <div className={`rounded-3xl bg-gradient-to-br from-white to-slate-50 shadow-[0_10px_30px_-5px_rgba(0,85,184,0.2)] text-coppel-blue transform transition hover:scale-105 duration-300 border border-slate-100 icon-glow ${kioskMode ? 'mb-12 p-12' : 'mb-8 p-6'}`}><SlideIcon size={kioskMode ? 120 : 64} /></div>
+               <h3 className={`font-bold text-slate-800 text-center font-heading tracking-tight drop-shadow-sm uppercase ${kioskMode ? 'text-6xl md:text-8xl mb-8 leading-[1.1]' : 'text-3xl md:text-5xl mb-3'}`}>{slide?.title}</h3>
+               {slide?.subtitle && <p className={`text-slate-500 font-medium text-center max-w-xl leading-relaxed ${kioskMode ? 'text-3xl md:text-4xl mb-16 max-w-4xl' : 'text-lg md:text-xl mb-10'}`}>{slide?.subtitle}</p>}
                <div className="w-full h-auto p-2">
-                 {slide.type === 'text' && (<div className="bg-white/70 backdrop-blur-xl p-8 rounded-[2rem] border border-white/60 shadow-lg text-center">{slide.content.map((item, i) => (<p key={i} className="text-xl md:text-2xl text-slate-700 leading-relaxed font-medium mb-4 last:mb-0">{item.value}</p>))}</div>)}
-                 {slide.type === 'grid' && (<div className="flex flex-wrap justify-center gap-4">{slide.content.map((item, i) => (<div key={i} className="bg-white/80 p-6 rounded-2xl border border-white shadow-md min-w-[160px] text-center"><div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">{item.label}</div><div className="text-3xl font-black text-coppel-blue font-heading">{item.value}</div></div>))}</div>)}
-                 {slide.type === 'list' && (<div className="bg-white/70 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-lg overflow-hidden">{slide.content.map((item, i) => (<div key={i} className="p-5 border-b border-slate-100 last:border-0 flex items-center gap-4"><div className="bg-green-100 text-green-600 p-1.5 rounded-full"><Icons.Check size={20}/></div><span className="font-medium text-slate-700 text-lg md:text-xl">{item.value}</span></div>))}</div>)}
-                 {slide.type === 'image' && (<div className="w-full h-64 md:h-96 relative rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white bg-slate-200"><img src={getDirectImageUrl(slide.content[0]?.value)} className="w-full h-full object-contain" onError={(e) => {e.target.src='https://placehold.co/600x400?text=Imagen+No+Disponible';}} /></div>)}
-                 {slide.type === 'links' && (<div className="flex flex-col gap-3 w-full max-w-lg mx-auto">{slide.content.map((item, i) => (<a key={i} href={item.value} target="_blank" className="group flex items-center gap-3 p-4 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md hover:border-coppel-blue/30 hover:-translate-y-1 transition-all cursor-pointer no-underline"><div className="bg-blue-50 text-coppel-blue p-2 rounded-lg group-hover:bg-coppel-blue group-hover:text-white transition-colors">{item.value.includes('.pdf') ? <Icons.File size={20}/> : <Icons.Link size={20}/>}</div><div className="flex-1 text-left"><div className="font-bold text-slate-800 text-base">{item.label || 'Abrir Enlace'}</div><div className="text-[10px] text-slate-400 truncate max-w-[250px]">{item.value}</div></div><div className="text-slate-300 group-hover:text-coppel-blue"><Icons.ChevronRight size={18}/></div></a>))}</div>)}
+                 {slide?.type === 'text' && (<div className={`bg-white/70 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-lg text-center ${kioskMode ? 'p-16' : 'p-8'}`}>{slide?.content?.map((item, i) => (<p key={i} className={`text-slate-700 leading-relaxed font-medium mb-4 last:mb-0 ${kioskMode ? 'text-4xl md:text-5xl mb-10' : 'text-xl md:text-2xl'}`}>{item.value}</p>))}</div>)}
+                 {slide?.type === 'grid' && (<div className={`flex flex-wrap justify-center gap-6 ${kioskMode ? 'gap-10' : ''}`}>{slide?.content?.map((item, i) => (<div key={i} className={`bg-white/80 rounded-2xl border border-white shadow-md text-center flex flex-col justify-center ${kioskMode ? 'p-12 min-w-[300px]' : 'p-6 min-w-[160px]'}`}><div className={`font-bold text-slate-400 uppercase tracking-widest mb-1 ${kioskMode ? 'text-xl' : 'text-xs'}`}>{item.label}</div><div className={`font-black text-coppel-blue font-heading ${kioskMode ? 'text-6xl mt-2' : 'text-3xl'}`}>{item.value}</div></div>))}</div>)}
+                 {slide?.type === 'list' && (<div className={`bg-white/70 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-lg overflow-hidden ${kioskMode ? 'max-w-4xl mx-auto' : ''}`}>{slide?.content?.map((item, i) => (
+                   <div key={i} className={`border-b border-slate-100 last:border-0 flex items-center gap-4 ${kioskMode ? 'p-8' : 'p-5'}`}>
+                     <div className={`bg-green-100 text-green-600 rounded-full ${kioskMode ? 'p-3' : 'p-1.5'}`}><Icons.Check size={kioskMode ? 32 : 20}/></div>
+                     <span className={`font-medium text-slate-700 ${kioskMode ? 'text-4xl' : 'text-lg md:text-xl text-left'}`}>{item.value}</span>
+                   </div>
+                 ))}</div>)}
+                 {slide?.type === 'image' && (<div className={`relative rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white bg-slate-200 ${kioskMode ? 'h-[50vh] w-full' : 'h-64 md:h-96 w-full'}`}><img src={getDirectImageUrl(slide?.content[0]?.value)} className="w-full h-full object-contain" onError={(e) => {e.target.src='https://placehold.co/1200x800?text=Imagen+No+Disponible';}} /></div>)}
+                 {slide?.type === 'links' && (<div className={`flex flex-col gap-4 w-full mx-auto ${kioskMode ? 'max-w-2xl' : 'max-w-lg'}`}>{slide?.content?.map((item, i) => (
+                    <a key={i} href={item.value} target="_blank" className={`group flex items-center gap-4 bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md hover:border-coppel-blue/30 hover:-translate-y-1 transition-all cursor-pointer no-underline ${kioskMode ? 'p-8' : 'p-4'}`}>
+                      <div className={`bg-blue-50 text-coppel-blue rounded-lg group-hover:bg-coppel-blue group-hover:text-white transition-colors ${kioskMode ? 'p-4' : 'p-2'}`}>{item.value.includes('.pdf') ? <Icons.File size={kioskMode ? 32 : 20}/> : <Icons.Link size={kioskMode ? 32 : 20}/>}</div>
+                      <div className="flex-1 text-left">
+                        <div className={`font-bold text-slate-800 ${kioskMode ? 'text-3xl' : 'text-base'}`}>{item.label || 'Abrir Enlace'}</div>
+                        <div className={`text-slate-400 truncate ${kioskMode ? 'text-lg' : 'text-[10px]'}`}>{item.value}</div>
+                      </div>
+                      <div className="text-slate-300 group-hover:text-coppel-blue transition-colors"><Icons.ChevronRight size={kioskMode ? 32 : 18}/></div>
+                    </a>
+                  ))}</div>)}
                </div>
             </div>
           </div>
-          <button onClick={(e) => { e.stopPropagation(); if(currentSlideIndex > 0) { setCurrentSlideIndex(c=>c-1); setProgress(0); } else { setCurrentSlideIndex(data.slides.length-1); setProgress(0); } }} className="absolute left-4 top-1/2 -translate-y-1/2 p-4 rounded-full bg-white/50 hover:bg-white backdrop-blur text-coppel-blue transition-all shadow-xl z-50 cursor-pointer active:scale-90" style={{pointerEvents: 'auto'}}><Icons.ChevronLeft size={32} /></button>
-          <button onClick={(e) => { e.stopPropagation(); if(currentSlideIndex < data.slides.length-1) { setCurrentSlideIndex(c=>c+1); setProgress(0); } else { setCurrentSlideIndex(0); setProgress(0); } }} className="absolute right-4 top-1/2 -translate-y-1/2 p-4 rounded-full bg-white/50 hover:bg-white backdrop-blur text-coppel-blue transition-all shadow-xl z-50 cursor-pointer active:scale-90" style={{pointerEvents: 'auto'}}><Icons.ChevronRight size={32} /></button>
-          <div className="h-14 bg-coppel-yellow text-coppel-dark flex items-center relative z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-yellow-400"><div className="bg-[#E6BC00] h-full px-6 flex items-center justify-center font-bold text-sm uppercase tracking-widest z-10 shrink-0">Avisos Importantes</div><div className="ticker-wrap flex-1"><div className="ticker-move text-base font-bold py-2"><span className="ticker-item">{data.ticker}</span><span className="ticker-item">{data.ticker}</span><span className="ticker-item">{data.ticker}</span><span className="ticker-item">{data.ticker}</span></div></div></div>
+
+          {/* BARRA DE REACCIONES INTEGRADA ENTRE EL RECUADRO Y LA CINTILLA */}
+          <div className={`w-full z-30 flex justify-center items-center gap-2 py-4 bg-white/40 backdrop-blur-md border-t border-white/50`}>
+              <div className={`flex gap-5 items-center px-8 py-3 rounded-full glass-premium shadow-xl transition-transform ${kioskMode ? 'scale-150 py-4 mb-6' : ''}`}>
+                  <button onClick={() => handleReaction('like')} className="hover:scale-125 transition-all p-1 text-coppel-blue active:scale-90" title="Me gusta"><Icons.ThumbsUp size={24}/></button>
+                  <button onClick={() => handleReaction('dislike')} className="hover:scale-125 transition-all p-1 text-slate-400 active:scale-90" title="No me gusta"><Icons.ThumbsDown size={24}/></button>
+                  <div className="w-px h-6 bg-slate-300 mx-1"></div>
+                  {['❤️', '👋', '👏', '🔥'].map(emoji => (
+                      <button key={emoji} onClick={() => handleReaction(emoji)} className="text-2xl hover:scale-150 transition-all focus:outline-none active:scale-90">{emoji}</button>
+                  ))}
+              </div>
+          </div>
+
+          <button onClick={(e) => { e.stopPropagation(); setCurrentSlideIndex(currentSlideIndex > 0 ? currentSlideIndex-1 : slides.length-1); setProgress(0); }} className={`absolute left-6 top-1/2 -translate-y-1/2 rounded-full bg-white/50 hover:bg-white backdrop-blur text-coppel-blue transition-all shadow-xl z-50 active:scale-90 ${kioskMode ? 'p-8' : 'p-4'}`}><Icons.ChevronLeft size={kioskMode ? 48 : 32} /></button>
+          <button onClick={(e) => { e.stopPropagation(); setCurrentSlideIndex(currentSlideIndex < slides.length-1 ? currentSlideIndex+1 : 0); setProgress(0); }} className={`absolute right-6 top-1/2 -translate-y-1/2 rounded-full bg-white/50 hover:bg-white backdrop-blur text-coppel-blue transition-all shadow-xl z-50 active:scale-90 ${kioskMode ? 'p-8' : 'p-4'}`}><Icons.ChevronRight size={kioskMode ? 48 : 32} /></button>
+          
+          <div className={`bg-coppel-yellow text-coppel-dark flex items-center relative z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-yellow-400 ${kioskMode ? 'h-24' : 'h-14'}`}>
+            <div className={`bg-[#E6BC00] h-full flex items-center justify-center font-black uppercase tracking-widest z-10 shrink-0 ${kioskMode ? 'px-12 text-2xl' : 'px-6 text-sm'}`}>Avisos Importantes</div>
+            <div className="ticker-wrap flex-1">
+              <div className={`ticker-move font-black py-2 ${kioskMode ? 'text-4xl' : 'text-base'}`}>
+                <span className="ticker-item uppercase">{data?.ticker}</span>
+                <span className="ticker-item uppercase">{data?.ticker}</span>
+                <span className="ticker-item uppercase">{data?.ticker}</span>
+                <span className="ticker-item uppercase">{data?.ticker}</span>
+              </div>
+            </div>
+          </div>
         </div>
       );
     }
 
     function AdminPanel({ onClose, activeNotice, requests }) {
        const [tab, setTab] = useState('editor');
-       const [editingNotice, setEditingNotice] = useState(activeNotice || { id: null, type: 'info', title: '', subtitle: '', date: 'HOY', ticker: '', active: true, pinned: false, slides: [{ id: Date.now(), title: 'Inicio', subtitle: '', icon: 'Info', type: 'text', content: [{value: ''}] }] });
+       const defaultNotice = { id: null, type: 'info', title: '', subtitle: '', date: 'HOY', ticker: '', active: true, pinned: false, slides: [{ id: Date.now(), title: 'Inicio', subtitle: '', icon: 'Info', type: 'text', content: [{value: ''}] }] };
+       const [editingNotice, setEditingNotice] = useState(activeNotice || defaultNotice);
 
-       const handleSave = async (noticeData) => {
-           try {
-               const docId = noticeData.id ? String(noticeData.id) : String(Date.now());
-               const nData = { ...noticeData, id: Number(docId) };
-               if (!noticeData.id) { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notices', docId), { ...nData, views: 0 }); }
-               else { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notices', docId), nData); }
-               alert('Aviso guardado correctamente', 'success');
-           } catch (e) { alert('Error al guardar: ' + e.message, 'error'); }
-       };
-
-       const handleApprove = async (req) => {
-           try {
-               await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', req.id), { status: 'approved' });
-               alert('Usuario aprobado correctamente', 'success');
-           } catch(e) { alert('Error al aprobar: ' + e.message, 'error'); }
-       };
-
-       const handleReject = async (id) => {
-           try {
-               await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', id));
-               alert('Solicitud eliminada correctamente', 'info');
-           } catch(e) { alert('Error al rechazar: ' + e.message, 'error'); }
-       };
+       useEffect(() => { if (activeNotice) setEditingNotice(activeNotice); }, [activeNotice?.id]);
 
        return (
-        <div className="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4 md:p-8 animate-in">
-           <div className="bg-white w-full max-w-[90vw] h-[90vh] rounded-[32px] overflow-hidden shadow-2xl flex flex-col">
+        <div className="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4 md:p-8 animate-in text-left">
+           <div className="bg-white w-full max-w-[90vw] h-[90vh] rounded-[32px] overflow-hidden shadow-2xl flex flex-col text-left">
               <div className="bg-slate-50 p-6 border-b flex justify-between items-center shrink-0">
-                  <div className="flex items-center gap-6">
-                      <div><h2 className="text-2xl font-black text-slate-800">Panel de Control</h2><p className="text-sm text-slate-500">Administración de Plataforma</p></div>
-                      <div className="flex bg-slate-200 p-1 rounded-xl">
-                          <button onClick={()=>setTab('editor')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'editor' ? 'bg-white shadow text-coppel-blue' : 'text-slate-500'}`}>Editor</button>
-                          <button onClick={()=>setTab('preview')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'preview' ? 'bg-white shadow text-coppel-blue' : 'text-slate-500'}`}>Vista Previa</button>
-                          <button onClick={()=>setTab('requests')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${tab === 'requests' ? 'bg-white shadow text-coppel-blue' : 'text-slate-500'}`}>Solicitudes {requests.length > 0 && <span className="bg-red-500 text-white px-1.5 rounded-full text-[10px]">{requests.length}</span>}</button>
-                      </div>
-                  </div>
-                  <button onClick={onClose} className="bg-slate-200 p-2 rounded-full hover:bg-slate-300"><Icons.X size={24}/></button>
+                  <div className="flex items-center gap-6"><div><h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Panel de Control</h2><p className="text-sm text-slate-500 font-medium uppercase tracking-widest">Gestión Corporativa</p></div><div className="flex bg-slate-200 p-1 rounded-xl"><button onClick={()=>setTab('editor')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'editor' ? 'bg-white shadow text-coppel-blue' : 'text-slate-500'}`}>Editor</button><button onClick={()=>setTab('preview')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'preview' ? 'bg-white shadow text-coppel-blue' : 'text-slate-500'}`}>Previsualizar</button><button onClick={()=>setTab('requests')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${tab === 'requests' ? 'bg-white shadow text-coppel-blue' : 'text-slate-500'}`}>Solicitudes {requests?.length > 0 && <span className="bg-red-500 text-white px-1.5 rounded-full text-[10px] font-black">{requests.length}</span>}</button></div></div>
+                  <button onClick={onClose} className="bg-slate-200 p-2 rounded-full hover:bg-slate-300 transition-colors active:scale-90"><Icons.X size={24}/></button>
               </div>
               <div className="flex-1 overflow-hidden bg-slate-100 relative">
-                  {tab === 'editor' && <EditorTab notice={editingNotice} setNotice={setEditingNotice} onSave={handleSave} onCreateNew={() => setEditingNotice({ id: null, type: 'info', title: '', subtitle: '', date: 'HOY', ticker: '', active: true, pinned: false, slides: [{ id: Date.now(), title: 'Inicio', subtitle: '', icon: 'Info', type: 'text', content: [{value: ''}] }] })} />}
-                  {tab === 'preview' && <div className="w-full h-full flex items-center justify-center p-8 overflow-y-auto bg-slate-200"><div className="scale-[0.8] origin-center w-full max-w-5xl"><NextGenViewer data={editingNotice} kioskMode={false} /></div></div>}
+                  {tab === 'editor' && <EditorTab notice={editingNotice} setNotice={setEditingNotice} onSave={async (nD) => {
+                       try {
+                           const dI = nD.id ? String(nD.id) : String(Date.now());
+                           const finalData = { ...nD, id: Number(dI) };
+                           if (!nD.id) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notices', dI), { ...finalData, views: 0 });
+                           else await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notices', dI), finalData);
+                           alert('Aviso guardado correctamente.', 'success');
+                       } catch (e) { alert(e.message, 'error'); }
+                  }} onCreateNew={() => setEditingNotice(defaultNotice)} />}
+                  {tab === 'preview' && <div className="w-full h-full flex items-center justify-center p-8 overflow-y-auto bg-slate-200"><div className="scale-[0.8] origin-center w-full max-w-5xl"><NextGenViewer user={{role:'user'}} data={editingNotice} kioskMode={false} /></div></div>}
                   {tab === 'requests' && (
-                      <div className="p-8 max-w-4xl mx-auto overflow-y-auto h-full">
-                        <h3 className="text-xl font-bold text-slate-700 mb-6">Administración de Accesos</h3>
-                        <div className="bg-blue-50 p-6 rounded-2xl mb-8 border border-blue-100 shadow-sm">
-                            <h4 className="text-sm font-bold text-blue-800 mb-4 flex items-center gap-2">🚀 Registro Manual de Usuario</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <input id="rescueUid" placeholder="UID de Firebase Auth" className="p-3 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-blue-400" />
-                                <input id="rescueEmail" placeholder="Correo Corporativo" className="p-3 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-blue-400" />
-                                <input id="rescueName" placeholder="Nombre Completo" className="p-3 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-blue-400" />
-                                <input id="rescueEmpId" placeholder="No. Empleado" className="p-3 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-blue-400" />
+                      <div className="p-8 max-w-4xl mx-auto overflow-y-auto h-full space-y-4 text-left">
+                        <h3 className="text-xl font-bold text-slate-700 mb-6 uppercase tracking-tighter text-left">Administración de Accesos</h3>
+                        {(!requests || requests.length === 0) ? <div className="text-center py-20 text-slate-300 italic font-bold uppercase tracking-widest text-sm">Sin solicitudes pendientes.</div> : requests.map(req => (
+                            <div key={req.id} className="bg-white p-6 rounded-2xl shadow-sm border flex items-center justify-between animate-in text-left">
+                                <div className="flex items-center gap-4 text-left"><div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center font-black text-slate-500 uppercase">{req.name?.charAt(0)}</div><div className="text-left"><h4 className="font-bold text-slate-800 uppercase text-sm">{req.name}</h4><div className="text-[10px] text-slate-400 font-black uppercase">{req.email} • {req.area}</div></div></div>
+                                <div className="flex gap-3 text-left"><button onClick={async () => { try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', req.id)); } catch(e){} }} className="px-4 py-2 text-red-500 font-bold hover:bg-red-50 rounded-xl transition-colors text-xs uppercase tracking-widest">Rechazar</button><button onClick={async () => { try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', req.id), { status: 'approved' }); } catch(e){} }} className="px-6 py-2 bg-coppel-blue text-white rounded-xl font-bold hover:brightness-110 transition-all shadow-md text-xs uppercase tracking-widest active:scale-95">Aprobar Acceso</button></div>
                             </div>
-                            <div className="flex justify-end">
-                                <button onClick={async () => {
-                                        const uid = document.getElementById('rescueUid').value.trim();
-                                        const email = document.getElementById('rescueEmail').value.trim();
-                                        const name = document.getElementById('rescueName').value.trim();
-                                        const empId = document.getElementById('rescueEmpId').value.trim();
-                                        if(!uid || !email || !name || !empId) return alert("Por favor, llena todos los campos", 'error');
-                                        try {
-                                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', uid), {
-                                                uid, email, name, empId, status: 'approved', role: 'user', area: 'REGISTRO ADMIN', date: new Date().toISOString()
-                                            });
-                                            alert("¡Usuario registrado y acceso activado!", "success");
-                                            document.getElementById('rescueUid').value = ""; document.getElementById('rescueEmail').value = ""; document.getElementById('rescueName').value = ""; document.getElementById('rescueEmpId').value = "";
-                                        } catch(e) { alert("Error: " + e.message, "error"); }
-                                    }} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95">ACTIVAR ACCESO</button>
-                            </div>
-                        </div>
-                        <div className="space-y-4">
-                            {requests.length === 0 ? (<div className="text-center py-10 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400">No hay solicitudes pendientes.</div>) : (
-                                requests.map(req => (
-                                    <div key={req.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-xl">{req.name ? req.name.charAt(0) : '?'}</div>
-                                            <div><h4 className="font-bold text-slate-800">{req.name} <span className="text-slate-400 font-normal">({req.empId})</span></h4><div className="flex gap-2 text-xs font-bold mt-1"><span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded">{req.area}</span><span className="text-slate-400">{req.email}</span></div></div>
-                                        </div>
-                                        <div className="flex gap-3">
-                                            <button onClick={() => { if(confirm('¿Rechazar solicitud?')) handleReject(req.id); }} className="px-4 py-2 rounded-xl text-red-500 font-bold hover:bg-red-50 transition-colors">Rechazar</button>
-                                            <button onClick={() => handleApprove(req)} className="px-6 py-2 rounded-xl bg-coppel-blue text-white font-bold hover:brightness-110 shadow-lg transition-all">Aprobar Acceso</button>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
+                        ))}
                       </div>
                   )}
               </div>
@@ -594,45 +666,57 @@
 
     function EditorTab({ notice, setNotice, onSave, onCreateNew }) {
       const [activeSlideIdx, setActiveSlideIdx] = useState(0);
-      const updateMain = (k, v) => setNotice(p => ({ ...p, [k]: v }));
-      const updateSlide = (idx, k, v) => { const n = [...notice.slides]; n[idx][k] = v; setNotice(p => ({ ...p, slides: n })); };
-      const updateContent = (si, ci, k, v) => { const n = [...notice.slides]; n[si].content[ci][k] = v; setNotice(p => ({ ...p, slides: n })); };
-      const addSlide = () => { setNotice(p => ({ ...p, slides: [...p.slides, { id: Date.now(), title: 'Nueva', subtitle: '', icon: 'Info', type: 'text', content: [{value: ''}] }] })); setActiveSlideIdx(notice.slides.length); };
-      const removeSlide = (idx) => { if(notice.slides.length <= 1) return alert("Mínimo 1 diapositiva"); const n = notice.slides.filter((_, i) => i !== idx); setNotice(p => ({ ...p, slides: n })); setActiveSlideIdx(0); };
-
+      const safeSlides = notice?.slides || [];
+      const currentSlide = safeSlides[activeSlideIdx] || { title: '', icon: 'Info', type: 'text', content: [] };
       return (
-        <div className="flex h-full">
-             <div className="w-80 bg-white border-r border-slate-200 flex flex-col overflow-y-auto custom-scrollbar">
-                <div className="p-4 bg-blue-50 border-b border-blue-100"><button onClick={onCreateNew} className="w-full bg-white text-coppel-blue border border-blue-200 font-bold py-3 rounded-xl hover:bg-blue-50 transition-all flex items-center justify-center gap-2 text-xs"><Icons.Plus size={16}/> + NUEVO AVISO</button></div>
-                <div className="p-5 border-b bg-slate-50">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">General</h3>
-                    <div className="space-y-3">
-                      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Título</label><input value={notice.title} onChange={e => updateMain('title', e.target.value)} className="w-full p-2 rounded border border-slate-300 text-sm font-bold" /></div>
-{/* --- ESTA ES LA LÍNEA AGREGADA --- */}
-<div><label className="text-[10px] font-bold text-slate-400 uppercase">Subtítulo General</label><textarea rows="2" value={notice.subtitle} onChange={e => updateMain('subtitle', e.target.value)} className="w-full p-2 rounded border border-slate-300 text-sm font-bold resize-none" placeholder="Descripción para el historial..." /></div>
-                        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Ticker (Cintilla)</label><input value={notice.ticker} onChange={e => updateMain('ticker', e.target.value)} className="w-full p-2 rounded border border-slate-300 text-sm" /></div>
-                        <div className="grid grid-cols-2 gap-2"><div><label className="text-[10px] font-bold text-slate-400 uppercase">Fecha</label><input value={notice.date} onChange={e => updateMain('date', e.target.value)} className="w-full p-2 rounded border border-slate-300 text-sm" /></div><div><label className="text-[10px] font-bold text-slate-400 uppercase">Tipo</label><select value={notice.type} onChange={e => updateMain('type', e.target.value)} className="w-full p-2 rounded border border-slate-300 text-sm"><option value="info">Info</option><option value="urgent">Urgente</option><option value="congrats">Logro</option></select></div></div>
+        <div className="flex h-full text-left">
+             <div className="w-80 bg-white border-r flex flex-col overflow-y-auto custom-scrollbar text-left">
+                <div className="p-4 text-left"><button onClick={onCreateNew} className="w-full bg-slate-50 text-coppel-blue border font-bold py-3 rounded-xl text-[10px] hover:bg-slate-100 transition-colors uppercase tracking-widest">+ NUEVO AVISO</button></div>
+                <div className="p-5 border-b bg-slate-50 space-y-3 text-left">
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">General</h3>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase">Título Principal</label><input value={notice?.title || ''} onChange={e => setNotice({...notice, title: e.target.value})} className="w-full p-2 rounded border text-sm font-bold uppercase focus:ring-2 focus:ring-coppel-blue/20 outline-none" /></div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase">Subtítulo (Historial)</label><textarea value={notice?.subtitle || ''} onChange={e => setNotice({...notice, subtitle: e.target.value})} className="w-full p-2 rounded border text-xs font-medium resize-none outline-none focus:ring-2 focus:ring-coppel-blue/20" rows="2" /></div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase">Cintilla (Ticker)</label><input value={notice?.ticker || ''} onChange={e => setNotice({...notice, ticker: e.target.value})} className="w-full p-2 rounded border text-xs font-bold uppercase focus:ring-2 focus:ring-coppel-blue/20 outline-none" /></div>
+                    <div className="grid grid-cols-2 gap-2 text-left">
+                        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Fecha</label><input value={notice?.date || ''} onChange={e => setNotice({...notice, date: e.target.value})} className="w-full p-2 rounded border text-xs uppercase outline-none focus:ring-2 focus:ring-coppel-blue/20" /></div>
+                        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Tipo</label><select value={notice?.type || 'info'} onChange={e => setNotice({...notice, type: e.target.value})} className="w-full p-2 rounded border text-xs font-bold uppercase outline-none focus:ring-2 focus:ring-coppel-blue/20"><option value="info">Info</option><option value="urgent">Urgente</option><option value="congrats">Logro</option></select></div>
                     </div>
                 </div>
-                <div className="p-5 flex-1"><h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Diapositivas</h3><div className="space-y-2">{notice.slides.map((s, idx) => (<button key={idx} onClick={() => setActiveSlideIdx(idx)} className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-2 ${activeSlideIdx === idx ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white border-slate-100 hover:bg-slate-50 text-slate-600'}`}><div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${activeSlideIdx === idx ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{idx+1}</div><span className="text-sm font-medium truncate flex-1">{s.title || 'Sin Título'}</span><div onClick={(e) => { e.stopPropagation(); removeSlide(idx); }} className={`p-1 hover:text-red-300 ${activeSlideIdx===idx ? 'text-blue-200' : 'text-slate-300'}`}><Icons.Trash size={14}/></div></button>))}<button onClick={addSlide} className="w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-400 font-bold text-xs hover:border-blue-400 hover:text-blue-500 flex items-center justify-center gap-2">+ AGREGAR PAGINA</button></div></div>
-                <div className="p-4 border-t bg-white sticky bottom-0"><button onClick={() => onSave(notice)} className="w-full py-4 rounded-xl bg-coppel-blue text-white font-bold text-sm hover:bg-blue-700 shadow-lg flex justify-center items-center gap-2 transform active:scale-95 transition-all"><Icons.Save size={18}/> GUARDAR CAMBIOS</button></div>
+                <div className="p-5 flex-1 space-y-2 text-left">
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Páginas</h3>
+                    {safeSlides.map((s, idx) => (
+                      <button key={idx} onClick={() => setActiveSlideIdx(idx)} className={`w-full text-left p-3 rounded-xl border flex items-center justify-between transition-all ${activeSlideIdx === idx ? 'bg-blue-600 text-white border-blue-700 shadow-md' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
+                        <span className="text-[10px] font-black uppercase truncate pr-2">{s.title || 'Sin Título'}</span>
+                        <Icons.Trash onClick={(e) => { e.stopPropagation(); if(safeSlides.length > 1) { setNotice({...notice, slides: safeSlides.filter((_, i) => i !== idx)}); setActiveSlideIdx(0); } else alert('Mínimo una página es requerida'); }} size={12} className={activeSlideIdx === idx ? 'text-blue-100' : 'text-slate-300'}/>
+                      </button>
+                    ))}
+                    <button onClick={() => setNotice({...notice, slides: [...safeSlides, { id: Date.now(), title: 'Nueva Página', icon: 'Info', type: 'text', content: [{value: ''}] }]})} className="w-full py-2 border-2 border-dashed rounded-xl text-slate-300 text-[10px] font-bold hover:border-blue-300 hover:text-blue-400 uppercase tracking-widest">+ AGREGAR PÁGINA</button>
+                </div>
+                <div className="p-4 border-t bg-white sticky bottom-0 text-left"><button onClick={() => onSave(notice)} className="w-full py-4 rounded-xl bg-coppel-blue text-white font-black text-xs uppercase tracking-widest shadow-xl hover:brightness-110 active:scale-95 transition-all">GUARDAR CAMBIOS</button></div>
              </div>
-             <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
-                 <div className="max-w-3xl mx-auto bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200">
-                     <div className="flex items-center gap-2 mb-6 pb-4 border-b"><span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">DIAPOSITIVA {activeSlideIdx + 1}</span><h2 className="text-xl font-bold text-slate-800">Detalles del Contenido</h2></div>
-                     <div className="space-y-6">
-                         <div className="grid md:grid-cols-2 gap-6">
-                            <div className="col-span-2"><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Título Principal</label><input value={notice.slides[activeSlideIdx].title} onChange={e => updateSlide(activeSlideIdx, 'title', e.target.value)} className="w-full text-lg font-bold p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-100" placeholder="Título de la diapositiva" /></div>
-                            {/* NUEVO APARTADO: Subtítulo de Página */}
-                            <div className="col-span-2"><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Subtítulo / Contexto de Página</label><input value={notice.slides[activeSlideIdx].subtitle || ''} onChange={e => updateSlide(activeSlideIdx, 'subtitle', e.target.value)} className="w-full p-3 border rounded-xl outline-none text-slate-600 focus:ring-2 focus:ring-blue-100" placeholder="Descripción breve debajo del título..." /></div>
-                            <div className="col-span-2"><label className="block text-xs font-bold text-slate-400 uppercase mb-2">Icono Ilustrativo</label><div className="flex flex-wrap gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-200">{SELECTABLE_ICONS.map(iconName => { const Ico = Icons[iconName]; const isSelected = notice.slides[activeSlideIdx].icon === iconName; return (<button key={iconName} onClick={() => updateSlide(activeSlideIdx, 'icon', iconName)} className={`p-3 rounded-xl transition-all ${isSelected ? 'bg-coppel-blue text-white shadow-md scale-110' : 'bg-white text-slate-400 hover:bg-white hover:text-blue-400 border border-slate-200'}`} title={iconName}><Ico size={24} /></button>) })}</div></div>
-                         </div>
-                         <div><label className="block text-xs font-bold text-slate-400 uppercase mb-2">Formato de Contenido</label><div className="flex gap-2 bg-slate-100 p-1.5 rounded-xl overflow-x-auto">{['text', 'grid', 'list', 'links', 'image'].map(type => (<button key={type} onClick={() => updateSlide(activeSlideIdx, 'type', type)} className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold uppercase transition-all whitespace-nowrap ${notice.slides[activeSlideIdx].type === type ? 'bg-white shadow text-coppel-blue' : 'text-slate-400 hover:text-slate-600'}`}>{type === 'text' ? 'Párrafos' : type === 'grid' ? 'Datos/Num' : type === 'list' ? 'Lista' : type === 'links' ? 'Enlaces' : 'Imagen'}</button>))}</div></div>
-                         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                             <div className="flex justify-between items-center mb-4"><label className="text-xs font-bold text-slate-400 uppercase">Items del Contenido</label>{notice.slides[activeSlideIdx].type !== 'image' && <button onClick={() => { const n = [...notice.slides]; n[activeSlideIdx].content.push({ label: '', value: '' }); setNotice({...notice, slides: n}); }} className="text-xs font-bold text-coppel-blue hover:underline">+ AGREGAR ITEM</button>}</div>
-                             <div className="space-y-3">{notice.slides[activeSlideIdx].type === 'image' ? (<div className="flex gap-2 items-center"><input className="flex-1 p-3 text-sm border rounded-lg outline-none" placeholder="https://ejemplo.com/imagen.jpg" value={notice.slides[activeSlideIdx].content[0]?.value || ''} onChange={e => { const n = [...notice.slides]; if(!n[activeSlideIdx].content[0]) n[activeSlideIdx].content[0] = {value: ''}; n[activeSlideIdx].content[0].value = e.target.value; setNotice({...notice, slides: n}); }} /><div className="w-12 h-12 rounded border bg-white flex items-center justify-center overflow-hidden shrink-0">{notice.slides[activeSlideIdx].content[0]?.value ? <img src={getDirectImageUrl(notice.slides[activeSlideIdx].content[0].value)} className="w-full h-full object-cover"/> : <Icons.Image size={20} className="text-slate-300"/>}</div></div>) : (<>{notice.slides[activeSlideIdx].content.map((item, cIdx) => (<div key={cIdx} className="flex gap-2 items-start animate-in">{(notice.slides[activeSlideIdx].type === 'grid' || notice.slides[activeSlideIdx].type === 'links') && (<input className="w-1/3 p-3 text-sm border rounded-xl outline-none" placeholder={notice.slides[activeSlideIdx].type === 'links' ? "Texto del Botón" : "Etiqueta (Ej. Meta)"} value={item.label || ''} onChange={e => updateContent(activeSlideIdx, cIdx, 'label', e.target.value)} />)}{notice.slides[activeSlideIdx].type === 'text' ? (<textarea className="flex-1 p-3 text-sm border rounded-xl resize-none outline-none h-24" placeholder="Escribe un párrafo..." value={item.value} onChange={e => updateContent(activeSlideIdx, cIdx, 'value', e.target.value)} />) : (<input className="flex-1 p-3 text-sm border rounded-xl outline-none" placeholder={notice.slides[activeSlideIdx].type === 'links' ? "URL (https://...)" : "Valor"} value={item.value} onChange={e => updateContent(activeSlideIdx, cIdx, 'value', e.target.value)} />)}<button onClick={() => { const n = [...notice.slides]; n[activeSlideIdx].content = n[activeSlideIdx].content.filter((_, i) => i !== cIdx); setNotice({...notice, slides: n}); }} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"><Icons.Trash size={18}/></button></div>))}</>)}</div>
-                         </div>
-                     </div>
+             <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-slate-100 text-left">
+                 <div className="max-w-2xl mx-auto bg-white p-8 rounded-[2rem] border shadow-sm space-y-6 text-left">
+                    <div className="flex items-center gap-2 border-b pb-4 text-left"><span className="bg-blue-100 text-blue-600 px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">Editor de Página {activeSlideIdx + 1}</span></div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block text-left">Título</label><input value={currentSlide.title} onChange={e => { const n = [...safeSlides]; n[activeSlideIdx].title = e.target.value; setNotice({...notice, slides: n}); }} className="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-100 font-bold uppercase" /></div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block text-left">Subtítulo</label><input value={currentSlide.subtitle || ''} onChange={e => { const n = [...safeSlides]; n[activeSlideIdx].subtitle = e.target.value; setNotice({...notice, slides: n}); }} className="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-100 font-medium" placeholder="Opcional..." /></div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block text-left text-left">Icono Visual</label><div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-xl border text-left">{SELECTABLE_ICONS.map(i => { const I = Icons[i]; return <button key={i} onClick={() => { const n = [...safeSlides]; n[activeSlideIdx].icon = i; setNotice({...notice, slides: n}); }} className={`p-2 rounded-lg transition-all ${currentSlide.icon === i ? 'bg-coppel-blue text-white shadow-md scale-110' : 'bg-white text-slate-400 hover:text-blue-400 border'}`}><I size={20}/></button>})}</div></div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block text-left">Formato de Contenido</label><div className="flex gap-2 bg-slate-100 p-1 rounded-xl text-left">{['text', 'grid', 'list', 'links', 'image'].map(t => <button key={t} onClick={() => { const n = [...safeSlides]; n[activeSlideIdx].type = t; setNotice({...notice, slides: n}); }} className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition-all uppercase ${currentSlide.type === t ? 'bg-white text-coppel-blue shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{t}</button>)}</div></div>
+                    <div className="bg-slate-50 p-6 rounded-2xl border space-y-4 text-left">
+                        <div className="flex justify-between items-center text-left"><label className="text-[10px] font-bold text-slate-400 uppercase">Items de Página</label>{currentSlide.type !== 'image' && <button onClick={() => { const n = [...safeSlides]; n[activeSlideIdx].content = [...(currentSlide.content || []), { label: '', value: '' }]; setNotice({...notice, slides: n}); }} className="text-[10px] font-bold text-coppel-blue hover:underline uppercase">+ AÑADIR ITEM</button>}</div>
+                        <div className="space-y-3 text-left">
+                          {currentSlide.type === 'image' ? (
+                            <input value={currentSlide.content?.[0]?.value || ''} onChange={e => { const n = [...safeSlides]; n[activeSlideIdx].content = [{value: e.target.value}]; setNotice({...notice, slides: n}); }} className="w-full p-3 border rounded-xl text-xs font-medium" placeholder="URL o ID de Google Drive..." />
+                          ) : (
+                            currentSlide.content?.map((c, i) => (
+                              <div key={i} className="flex gap-2 animate-in text-left">
+                                {(currentSlide.type === 'grid' || currentSlide.type === 'links') && <input value={c.label || ''} onChange={e => { const n = [...safeSlides]; n[activeSlideIdx].content[i].label = e.target.value; setNotice({...notice, slides: n}); }} className="w-1/3 p-2 border rounded-xl text-[10px] font-bold uppercase" placeholder="Etiqueta" />}
+                                <input value={c.value || ''} onChange={e => { const n = [...safeSlides]; n[activeSlideIdx].content[i].value = e.target.value; setNotice({...notice, slides: n}); }} className="flex-1 p-2 border rounded-xl text-xs font-medium focus:ring-2 focus:ring-coppel-blue/20 outline-none" placeholder="Valor / Link" />
+                                <button onClick={() => { const n = [...safeSlides]; n[activeSlideIdx].content = currentSlide.content.filter((_, idx) => idx !== i); setNotice({...notice, slides: n}); }} className="text-slate-300 hover:text-red-500 transition-colors"><Icons.Trash size={14}/></button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                    </div>
                  </div>
              </div>
         </div>
@@ -644,17 +728,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
