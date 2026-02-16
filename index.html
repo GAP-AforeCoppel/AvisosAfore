@@ -642,7 +642,7 @@
       );
     }
 
-   // --- NEXT GEN VIEWER (RESTAURADO: Diseño Original + Funcionalidad Actual) ---
+ // --- NEXT GEN VIEWER (REFINADO: Tamaños ajustados para elegancia) ---
     function NextGenViewer({ user, data, kioskMode, onExitKiosk }) {
       const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
       const [progress, setProgress] = useState(0);
@@ -650,7 +650,6 @@
       const [floatingEmojis, setFloatingEmojis] = useState([]);
       const DURATION = 8000; 
       
-      // Lógica de seguridad del código Actual para evitar pantallas blancas
       const slides = data?.slides && data.slides.length > 0 ? data.slides : [{ title: 'Sin contenido', icon: 'Info', type: 'text', content: [] }];
       const safeIndex = (currentSlideIndex >= 0 && currentSlideIndex < slides.length) ? currentSlideIndex : 0;
       const slide = slides[safeIndex] || { title: 'Cargando...', icon: 'Info', type: 'text', content: [] };
@@ -677,7 +676,6 @@
         return () => clearInterval(interval);
       }, [currentSlideIndex, isPaused, slides.length]);
 
-      // Lógica de Reacciones en Tiempo Real (Del código Actual)
       useEffect(() => {
           if (!data?.id || !user) return;
           const unsub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'reactions'), (snap) => {
@@ -709,18 +707,16 @@
           } catch(e) { console.error("Reaction error:", e); }
       };
 
-      // Escala para modo Kiosco (pero manteniendo el diseño original)
       const scaleClass = kioskMode === 'tv' ? 'scale-125' : 'scale-100';
 
       return (
         <div className={`glass-premium relative overflow-hidden flex flex-col shadow-2xl transition-all duration-500 select-none ${kioskMode ? 'w-full h-full rounded-none border-none shadow-none' : 'rounded-[32px] w-full max-w-4xl min-h-[600px] my-auto'}`} onMouseDown={() => setIsPaused(true)} onMouseUp={() => setIsPaused(false)}>
           
-          {/* Emojis Flotantes (Funcionalidad Actual) */}
           {floatingEmojis.map(r => (
               <div key={r.id} className="floating-reaction animate-fly-up" style={{ left: r.left }}>{r.emoji}</div>
           ))}
 
-          {/* CABECERA: Restaurada al diseño original (sin text-left) pero con el botón de cerrar del Kiosco */}
+          {/* CABECERA */}
           <div className="absolute top-0 left-0 w-full p-6 z-20 bg-gradient-to-b from-white via-white/80 to-transparent">
             <div className="flex gap-2 mb-4">
               {slides.map((_, idx) => (<div key={idx} className="h-1.5 flex-1 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-coppel-blue transition-all duration-75 ease-linear shadow-[0_0_8px_rgba(0,85,184,0.4)]" style={{ width: idx < safeIndex ? '100%' : idx === safeIndex ? `${progress}%` : '0%' }} /></div>))}
@@ -734,39 +730,41 @@
             </div>
           </div>
 
-          {/* CUERPO: Completamente restaurado al diseño centrado Original */}
-          <div className={`flex-1 flex flex-col items-center justify-center p-8 pt-32 relative z-10 ${scaleClass}`}>
+          {/* CUERPO: Ajustes de tamaño aplicados aquí */}
+          <div className={`flex-1 flex flex-col items-center justify-center p-8 pt-24 relative z-10 ${scaleClass}`}>
             <div key={safeIndex} className="w-full max-w-3xl animate-in flex flex-col items-center">
                
-               {/* Icono Principal con el efecto GLOW y gradiente original restaurado */}
-               <div className="mb-8 p-6 rounded-3xl bg-gradient-to-br from-white to-slate-50 shadow-[0_10px_30px_-5px_rgba(0,85,184,0.2)] text-coppel-blue transform transition hover:scale-105 duration-300 border border-slate-100 icon-glow">
-                 <SlideIcon size={64} />
+               {/* AJUSTE 1: Icono más discreto (p-5 en vez de p-6, size 56 en vez de 64) */}
+               <div className="mb-6 p-5 rounded-3xl bg-gradient-to-br from-white to-slate-50 shadow-[0_10px_30px_-5px_rgba(0,85,184,0.2)] text-coppel-blue transform transition hover:scale-105 duration-300 border border-slate-100 icon-glow">
+                 <SlideIcon size={56} />
                </div>
 
-               {/* Títulos Originales Centrados */}
-               <h3 className="text-3xl md:text-5xl font-bold text-slate-800 text-center mb-3 font-heading tracking-tight drop-shadow-sm">{slide?.title}</h3>
-               {slide?.subtitle && <p className="text-lg md:text-xl text-slate-500 font-medium text-center mb-10 max-w-xl leading-relaxed">{slide?.subtitle}</p>}
+               {/* AJUSTE 2: Títulos Reducidos (text-2xl/4xl en vez de 3xl/5xl) */}
+               <h3 className="text-2xl md:text-4xl font-bold text-slate-800 text-center mb-2 font-heading tracking-tight drop-shadow-sm leading-tight">{slide?.title}</h3>
+               {slide?.subtitle && <p className="text-base md:text-lg text-slate-500 font-medium text-center mb-8 max-w-xl leading-relaxed">{slide?.subtitle}</p>}
                
-               {/* Contenido Dinámico con Estilos Originales */}
                <div className="w-full h-auto p-2">
-                 {slide?.type === 'text' && (<div className="bg-white/70 backdrop-blur-xl p-8 rounded-[2rem] border border-white/60 shadow-lg text-center">{slide?.content?.map((item, i) => (<p key={i} className="text-xl md:text-2xl text-slate-700 leading-relaxed font-medium mb-4 last:mb-0">{item.value}</p>))}</div>)}
+                 {slide?.type === 'text' && (<div className="bg-white/70 backdrop-blur-xl p-6 rounded-[2rem] border border-white/60 shadow-lg text-center">{slide?.content?.map((item, i) => (<p key={i} className="text-lg md:text-xl text-slate-700 leading-relaxed font-medium mb-3 last:mb-0">{item.value}</p>))}</div>)}
                  
-                 {slide?.type === 'grid' && (<div className="flex flex-wrap justify-center gap-4">{slide?.content?.map((item, i) => (<div key={i} className="bg-white/80 p-6 rounded-2xl border border-white shadow-md min-w-[160px] text-center"><div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">{item.label}</div><div className="text-3xl font-black text-coppel-blue font-heading">{item.value}</div></div>))}</div>)}
+                 {/* AJUSTE 3: Cajas GRID (Datos/Num) Reducidas 
+                     - Padding bajado a p-4
+                     - Fuente bajada a text-xl (ideal para texto largo como en tu imagen)
+                 */}
+                 {slide?.type === 'grid' && (<div className="flex flex-wrap justify-center gap-3">{slide?.content?.map((item, i) => (<div key={i} className="bg-white/80 p-4 rounded-2xl border border-white shadow-md min-w-[140px] text-center max-w-sm"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{item.label}</div><div className="text-xl md:text-2xl font-black text-coppel-blue font-heading leading-tight">{item.value}</div></div>))}</div>)}
                  
-                 {slide?.type === 'list' && (<div className="bg-white/70 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-lg overflow-hidden">{slide?.content?.map((item, i) => (<div key={i} className="p-5 border-b border-slate-100 last:border-0 flex items-center gap-4"><div className="bg-green-100 text-green-600 p-1.5 rounded-full"><Icons.Check size={20}/></div><span className="font-medium text-slate-700 text-lg md:text-xl">{item.value}</span></div>))}</div>)}
+                 {slide?.type === 'list' && (<div className="bg-white/70 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-lg overflow-hidden">{slide?.content?.map((item, i) => (<div key={i} className="p-4 border-b border-slate-100 last:border-0 flex items-center gap-3"><div className="bg-green-100 text-green-600 p-1 rounded-full"><Icons.Check size={16}/></div><span className="font-medium text-slate-700 text-base md:text-lg">{item.value}</span></div>))}</div>)}
                  
-                 {slide?.type === 'image' && (<div className="w-full h-64 md:h-96 relative rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white bg-slate-200"><img src={getDirectImageUrl(slide?.content[0]?.value)} className="w-full h-full object-contain" onError={(e) => {e.target.src='https://placehold.co/600x400?text=Imagen+No+Disponible';}} /></div>)}
+                 {slide?.type === 'image' && (<div className="w-full h-64 md:h-80 relative rounded-[2rem] overflow-hidden shadow-xl border-4 border-white bg-slate-200"><img src={getDirectImageUrl(slide?.content[0]?.value)} className="w-full h-full object-contain" onError={(e) => {e.target.src='https://placehold.co/600x400?text=Imagen+No+Disponible';}} /></div>)}
                  
-                 {slide?.type === 'links' && (<div className="flex flex-col gap-3 w-full max-w-lg mx-auto">{slide?.content?.map((item, i) => (<a key={i} href={item.value} target="_blank" className="group flex items-center gap-3 p-4 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md hover:border-coppel-blue/30 hover:-translate-y-1 transition-all cursor-pointer no-underline"><div className="bg-blue-50 text-coppel-blue p-2 rounded-lg group-hover:bg-coppel-blue group-hover:text-white transition-colors">{item.value.includes('.pdf') ? <Icons.File size={20}/> : <Icons.Link size={20}/>}</div><div className="flex-1 text-left"><div className="font-bold text-slate-800 text-base">{item.label || 'Abrir Enlace'}</div><div className="text-[10px] text-slate-400 truncate max-w-[250px]">{item.value}</div></div><div className="text-slate-300 group-hover:text-coppel-blue"><Icons.ChevronRight size={18}/></div></a>))}</div>)}
+                 {slide?.type === 'links' && (<div className="flex flex-col gap-2 w-full max-w-lg mx-auto">{slide?.content?.map((item, i) => (<a key={i} href={item.value} target="_blank" className="group flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md hover:border-coppel-blue/30 hover:-translate-y-1 transition-all cursor-pointer no-underline"><div className="bg-blue-50 text-coppel-blue p-2 rounded-lg group-hover:bg-coppel-blue group-hover:text-white transition-colors">{item.value.includes('.pdf') ? <Icons.File size={18}/> : <Icons.Link size={18}/>}</div><div className="flex-1 text-left"><div className="font-bold text-slate-800 text-sm">{item.label || 'Abrir Enlace'}</div><div className="text-[10px] text-slate-400 truncate max-w-[250px]">{item.value}</div></div><div className="text-slate-300 group-hover:text-coppel-blue"><Icons.ChevronRight size={16}/></div></a>))}</div>)}
                </div>
             </div>
           </div>
 
-          {/* Controles Manuales */}
-          <button onClick={(e) => { e.stopPropagation(); if(currentSlideIndex > 0) { setCurrentSlideIndex(c=>c-1); setProgress(0); } else { setCurrentSlideIndex(slides.length-1); setProgress(0); } }} className="absolute left-4 top-1/2 -translate-y-1/2 p-4 rounded-full bg-white/50 hover:bg-white backdrop-blur text-coppel-blue transition-all shadow-xl z-50 cursor-pointer active:scale-90" style={{pointerEvents: 'auto'}}><Icons.ChevronLeft size={32} /></button>
-          <button onClick={(e) => { e.stopPropagation(); if(currentSlideIndex < slides.length-1) { setCurrentSlideIndex(c=>c+1); setProgress(0); } else { setCurrentSlideIndex(0); setProgress(0); } }} className="absolute right-4 top-1/2 -translate-y-1/2 p-4 rounded-full bg-white/50 hover:bg-white backdrop-blur text-coppel-blue transition-all shadow-xl z-50 cursor-pointer active:scale-90" style={{pointerEvents: 'auto'}}><Icons.ChevronRight size={32} /></button>
+          <button onClick={(e) => { e.stopPropagation(); if(currentSlideIndex > 0) { setCurrentSlideIndex(c=>c-1); setProgress(0); } else { setCurrentSlideIndex(slides.length-1); setProgress(0); } }} className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/50 hover:bg-white backdrop-blur text-coppel-blue transition-all shadow-lg z-50 cursor-pointer active:scale-90" style={{pointerEvents: 'auto'}}><Icons.ChevronLeft size={24} /></button>
+          <button onClick={(e) => { e.stopPropagation(); if(currentSlideIndex < slides.length-1) { setCurrentSlideIndex(c=>c+1); setProgress(0); } else { setCurrentSlideIndex(0); setProgress(0); } }} className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/50 hover:bg-white backdrop-blur text-coppel-blue transition-all shadow-lg z-50 cursor-pointer active:scale-90" style={{pointerEvents: 'auto'}}><Icons.ChevronRight size={24} /></button>
 
-          {/* Barra de Reacciones (Mantenida del Actual) */}
+          {/* BARRA DE REACCIONES */}
           <div className={`w-full z-30 flex justify-center items-center py-2 bg-white/40 backdrop-blur-md border-t border-white/50`}>
               <div className={`flex gap-4 items-center px-6 py-2 rounded-full glass-premium shadow-lg transition-transform ${kioskMode === 'tv' ? 'scale-125 mb-4' : 'scale-90 mb-1'}`}>
                   <button onClick={() => handleReaction('like')} className="hover:scale-125 transition-all p-1 text-coppel-blue active:scale-90" title="Me gusta"><Icons.ThumbsUp size={kioskMode === 'tv' ? 32 : 24}/></button>
@@ -778,7 +776,7 @@
               </div>
           </div>
 
-          {/* Cintilla (Ticker) Restaurada */}
+          {/* Ticker */}
           <div className="h-14 bg-coppel-yellow text-coppel-dark flex items-center relative z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-yellow-400">
             <div className="bg-[#E6BC00] h-full px-6 flex items-center justify-center font-bold text-sm uppercase tracking-widest z-10 shrink-0">Avisos Importantes</div>
             <div className="ticker-wrap flex-1">
@@ -790,12 +788,13 @@
         </div>
       );
     }
-
+    
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
 </body>
 </html>
+
 
 
 
