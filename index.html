@@ -406,14 +406,14 @@
                                           <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400 text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left"><Icons.Eye size={10} className="text-center"/> {notice.views || 0}</div>
                                           <button onClick={(e) => { e.stopPropagation(); setViewersModalNotice(notice); }} className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-coppel-blue transition-colors text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center" title="Visualizaciones"><Icons.List size={12} className="text-center"/></button>
                                         </div>
-                                    ) : <div></div>}
+                                      ) : <div></div>}
                                     {!notice.active && <span className="text-[9px] font-bold text-red-400 uppercase flex items-center gap-1 text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left font-black"><Icons.EyeOff size={10} className="text-center"/> Oculto</span>}
                                 </div>
                             </div>
                             {user?.role === 'admin' && (
                                 <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left">
                                     <button onClick={(e) => { e.stopPropagation(); updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notices', String(notice.id)), { pinned: !notice.pinned }); }} className={`shadow-sm border p-1 rounded-md transition-all text-center ${notice.pinned ? 'bg-yellow-100 text-yellow-600 border-yellow-200' : 'bg-white text-slate-300 hover:text-yellow-500'}`} title={notice.pinned ? "Quitar fijado" : "Fijar aviso"}><Icons.Pin size={12} className="text-center"/></button>
-                                    <button onClick={(e) => { e.stopPropagation(); updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notices', String(notice.id)), { active: !notice.active }); }} className="bg-white shadow-sm border p-1 rounded-md text-slate-300 hover:text-coppel-blue text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center" title={notice.active ? "Ocultar aviso" : "Mostrar aviso"}>{notice.active ? <Icons.EyeOff size={12} className="text-center"/> : <Icons.Eye size={12} className="text-center"/>}</button>
+                                    <button onClick={(e) => { e.stopPropagation(); updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notices', String(notice.id)), { active: !notice.active }); }} className="bg-white shadow-sm border p-1 rounded-md text-slate-300 hover:text-coppel-blue text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center" title={notice.active ? "Ocultar aviso" : "Mostrar aviso"}>{notice.active ? <Icons.EyeOff size={12} className="text-center"/> : <Icons.Eye size={12} className="text-center"/>}</button>
                                 </div>
                             )}
                         </div>
@@ -422,8 +422,92 @@
                 </section>
             )}
           </main>
-          {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} activeNotice={activeNotice} requests={requests} />}
+          {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} requests={requests} />}
           {viewersModalNotice && <ViewersModal notice={viewersModalNotice} onClose={() => setViewersModalNotice(null)} />}
+        </div>
+      );
+    }
+
+    // --- COMPONENTE AGREGADO: ADMIN PANEL ---
+    function AdminPanel({ onClose, requests }) {
+      const [tab, setTab] = useState('new'); // new, users
+      const [newNotice, setNewNotice] = useState({ title: '', subtitle: '', ticker: '', type: 'info', slides: [] });
+      
+      const createNotice = async () => {
+        if(!newNotice.title) return alert('El título es obligatorio', 'error');
+        const id = Date.now().toString();
+        // Crear un slide por defecto si no hay
+        const finalSlides = newNotice.slides.length > 0 ? newNotice.slides : [
+          { title: newNotice.title, subtitle: newNotice.subtitle, icon: 'Info', type: 'text', content: [{value: 'Contenido del aviso...'}]}
+        ];
+        
+        try {
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notices', id), {
+            id,
+            ...newNotice,
+            slides: finalSlides,
+            active: true,
+            pinned: false,
+            date: new Date().toLocaleDateString('es-MX', {day: '2-digit', month: 'short'})
+          });
+          alert('Aviso publicado correctamente', 'success');
+          onClose();
+        } catch(e) { alert('Error al guardar: ' + e.message, 'error'); }
+      };
+
+      const approveUser = async (uid) => {
+        try {
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', uid), { status: 'approved' });
+          alert('Usuario aprobado', 'success');
+        } catch(e) { alert(e.message, 'error'); }
+      };
+
+      return (
+        <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-6 animate-in">
+           <div className="glass-premium w-full max-w-2xl rounded-[32px] overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-white/50">
+                 <h2 className="font-heading font-black text-xl text-coppel-dark uppercase tracking-tighter">Panel de Control</h2>
+                 <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full"><Icons.X size={24}/></button>
+              </div>
+              <div className="flex border-b border-slate-200 bg-slate-50">
+                 <button onClick={() => setTab('new')} className={`flex-1 py-4 text-xs font-bold uppercase tracking-widest ${tab === 'new' ? 'bg-white text-coppel-blue border-b-2 border-coppel-blue' : 'text-slate-400 hover:text-slate-600'}`}>Nuevo Aviso</button>
+                 <button onClick={() => setTab('users')} className={`flex-1 py-4 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 ${tab === 'users' ? 'bg-white text-coppel-blue border-b-2 border-coppel-blue' : 'text-slate-400 hover:text-slate-600'}`}>
+                    Solicitudes {requests?.length > 0 && <span className="bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-[9px]">{requests.length}</span>}
+                 </button>
+              </div>
+              
+              <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-white">
+                 {tab === 'new' && (
+                    <div className="space-y-4">
+                       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Título</label><input value={newNotice.title} onChange={e=>setNewNotice({...newNotice, title: e.target.value})} className="w-full p-3 bg-slate-50 border rounded-xl" placeholder="Ej. Nuevo Beneficio" /></div>
+                       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Subtítulo</label><input value={newNotice.subtitle} onChange={e=>setNewNotice({...newNotice, subtitle: e.target.value})} className="w-full p-3 bg-slate-50 border rounded-xl" placeholder="Breve descripción..." /></div>
+                       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Cintilla (Ticker)</label><input value={newNotice.ticker} onChange={e=>setNewNotice({...newNotice, ticker: e.target.value})} className="w-full p-3 bg-slate-50 border rounded-xl" placeholder="Texto en movimiento..." /></div>
+                       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Tipo</label>
+                           <select value={newNotice.type} onChange={e=>setNewNotice({...newNotice, type: e.target.value})} className="w-full p-3 bg-slate-50 border rounded-xl text-sm font-bold text-slate-600">
+                             <option value="info">Información General (Azul)</option>
+                             <option value="urgent">Urgente / Alerta (Rojo)</option>
+                             <option value="congrats">Felicitación / Logro (Verde)</option>
+                           </select>
+                       </div>
+                       <button onClick={createNotice} className="w-full py-4 bg-coppel-blue text-white font-bold rounded-xl shadow-lg hover:brightness-110 active:scale-95 transition-all mt-4">PUBLICAR AVISO</button>
+                    </div>
+                 )}
+
+                 {tab === 'users' && (
+                    <div className="space-y-3">
+                       {requests.length === 0 ? <p className="text-center text-slate-400 text-sm py-10">No hay solicitudes pendientes.</p> : requests.map(req => (
+                          <div key={req.id} className="p-4 border rounded-2xl flex justify-between items-center bg-slate-50">
+                             <div>
+                                <p className="font-bold text-slate-800">{req.name}</p>
+                                <p className="text-xs text-slate-500">{req.email} • {req.area}</p>
+                             </div>
+                             <button onClick={() => approveUser(req.id)} className="bg-green-500 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-green-600 shadow-sm">Aprobar</button>
+                          </div>
+                       ))}
+                    </div>
+                 )}
+              </div>
+           </div>
         </div>
       );
     }
