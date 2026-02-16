@@ -642,7 +642,7 @@
       );
     }
 
-    // --- NEXT GEN VIEWER (HYBRID: Estructura Index 15 + Flechas + Emojis) ---
+   // --- NEXT GEN VIEWER (RESTAURADO: Diseño Original + Funcionalidad Actual) ---
     function NextGenViewer({ user, data, kioskMode, onExitKiosk }) {
       const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
       const [progress, setProgress] = useState(0);
@@ -650,7 +650,7 @@
       const [floatingEmojis, setFloatingEmojis] = useState([]);
       const DURATION = 8000; 
       
-      // FIX: Asegurar que data y data.slides existan para evitar pantalla blanca
+      // Lógica de seguridad del código Actual para evitar pantallas blancas
       const slides = data?.slides && data.slides.length > 0 ? data.slides : [{ title: 'Sin contenido', icon: 'Info', type: 'text', content: [] }];
       const safeIndex = (currentSlideIndex >= 0 && currentSlideIndex < slides.length) ? currentSlideIndex : 0;
       const slide = slides[safeIndex] || { title: 'Cargando...', icon: 'Info', type: 'text', content: [] };
@@ -677,6 +677,7 @@
         return () => clearInterval(interval);
       }, [currentSlideIndex, isPaused, slides.length]);
 
+      // Lógica de Reacciones en Tiempo Real (Del código Actual)
       useEffect(() => {
           if (!data?.id || !user) return;
           const unsub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'reactions'), (snap) => {
@@ -708,90 +709,81 @@
           } catch(e) { console.error("Reaction error:", e); }
       };
 
+      // Escala para modo Kiosco (pero manteniendo el diseño original)
       const scaleClass = kioskMode === 'tv' ? 'scale-125' : 'scale-100';
 
       return (
         <div className={`glass-premium relative overflow-hidden flex flex-col shadow-2xl transition-all duration-500 select-none ${kioskMode ? 'w-full h-full rounded-none border-none shadow-none' : 'rounded-[32px] w-full max-w-4xl min-h-[600px] my-auto'}`} onMouseDown={() => setIsPaused(true)} onMouseUp={() => setIsPaused(false)}>
           
+          {/* Emojis Flotantes (Funcionalidad Actual) */}
           {floatingEmojis.map(r => (
-              <div key={r.id} className="floating-reaction animate-fly-up text-left text-left text-left text-left" style={{ left: r.left }}>{r.emoji}</div>
+              <div key={r.id} className="floating-reaction animate-fly-up" style={{ left: r.left }}>{r.emoji}</div>
           ))}
 
-          {/* CABECERA (Estilo Index 15 con el Identificador de Tipo) */}
-          <div className={`absolute top-0 left-0 w-full z-20 bg-gradient-to-b from-white via-white/80 to-transparent text-left text-left ${kioskMode ? 'p-6 md:p-8' : 'p-6'}`}>
-            <div className="flex gap-2 mb-4 text-left">
-              {slides.map((_, idx) => (<div key={idx} className={`${kioskMode ? 'h-2 md:h-3' : 'h-1.5'} flex-1 bg-slate-200 rounded-full overflow-hidden text-left text-left text-left`}><div className="h-full bg-coppel-blue transition-all duration-75 ease-linear shadow-[0_0_8px_rgba(0,85,184,0.4)]" style={{ width: idx < safeIndex ? '100%' : idx === safeIndex ? `${progress}%` : '0%' }} /></div>))}
+          {/* CABECERA: Restaurada al diseño original (sin text-left) pero con el botón de cerrar del Kiosco */}
+          <div className="absolute top-0 left-0 w-full p-6 z-20 bg-gradient-to-b from-white via-white/80 to-transparent">
+            <div className="flex gap-2 mb-4">
+              {slides.map((_, idx) => (<div key={idx} className="h-1.5 flex-1 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-coppel-blue transition-all duration-75 ease-linear shadow-[0_0_8px_rgba(0,85,184,0.4)]" style={{ width: idx < safeIndex ? '100%' : idx === safeIndex ? `${progress}%` : '0%' }} /></div>))}
             </div>
-            <div className="flex justify-between items-start text-left text-left text-left">
-              <div className="flex gap-3 items-center text-left text-left text-left text-left">
-                {/* IDENTIFICADOR DE TIPO (Recuperado del Index 15) */}
-                <div className={`${kioskMode ? 'w-14 h-14 md:w-20 md:h-20 text-3xl md:text-4xl text-left' : 'w-10 h-10 text-lg'} rounded-full flex items-center justify-center text-white shadow-sm border border-slate-100 text-left text-left text-left ${data?.type === 'urgent' ? 'bg-red-500' : data?.type === 'congrats' ? 'bg-green-500' : 'bg-coppel-blue'}`}>{data?.type === 'congrats' ? '🎉' : data?.type === 'urgent' ? '⚠️' : '📢'}</div>
-                <div className="text-left text-left text-left text-left">
-                    <h2 className={`font-heading font-black text-slate-800 leading-tight uppercase text-left text-left ${kioskMode === 'tv' ? 'text-4xl md:text-5xl' : kioskMode === 'pc' ? 'text-2xl md:text-3xl' : 'text-lg'}`}>{data?.title}</h2>
-                    <p className={`font-medium text-slate-500 line-clamp-1 uppercase text-left text-left ${kioskMode === 'tv' ? 'text-2xl' : kioskMode === 'pc' ? 'text-lg' : 'text-xs'}`}>{data?.subtitle}</p>
-                </div>
+            <div className="flex justify-between items-start">
+              <div className="flex gap-3 items-center">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-lg shadow-sm border border-slate-100 ${data?.type === 'urgent' ? 'bg-red-500' : data?.type === 'congrats' ? 'bg-green-500' : 'bg-coppel-blue'}`}>{data?.type === 'congrats' ? '🎉' : data?.type === 'urgent' ? '⚠️' : '📢'}</div>
+                  <div><h2 className="font-heading font-black text-slate-800 text-lg leading-tight uppercase">{data?.title}</h2><p className="text-xs font-medium text-slate-500 line-clamp-1">{data?.subtitle}</p></div>
               </div>
-              <div className="flex items-center gap-2 text-left text-left text-left text-left">{kioskMode && <button onClick={onExitKiosk} className="bg-black/10 hover:bg-black/20 p-2 md:p-4 rounded-full text-slate-800 transition-colors active:scale-90 text-left text-left text-left"><Icons.X size={kioskMode === 'tv' ? 40 : 24}/></button>}</div>
+              <div className="flex items-center gap-2">{kioskMode && <button onClick={onExitKiosk} className="bg-black/10 hover:bg-black/20 p-2 rounded-full"><Icons.X size={20}/></button>}</div>
             </div>
           </div>
 
-          {/* CUERPO ADAPTABLE (Diseño Index 15 Recuperado) */}
-          <div className={`flex-1 flex flex-col items-center justify-center relative z-10 transition-all text-left text-left ${kioskMode ? 'pt-32 pb-4 px-10 md:px-20' : 'pt-32 pb-8 px-8'}`}>
-            <div key={safeIndex} className={`w-full animate-in flex flex-col items-center max-w-3xl text-left text-left ${scaleClass}`}>
-               <div className={`mb-8 p-6 rounded-3xl bg-gradient-to-br from-white to-slate-50 shadow-[0_10px_30px_-5px_rgba(0,85,184,0.2)] text-coppel-blue transform transition hover:scale-105 duration-300 border border-slate-100 icon-glow text-left text-left ${kioskMode === 'tv' ? 'mb-8 p-8 md:p-12' : 'mb-8 p-6'}`}><SlideIcon size={kioskMode === 'tv' ? 120 : 64} /></div>
-               {/* FUENTES AJUSTADAS AL INDEX 15 (Sin text-7xl) */}
-               <h3 className={`text-3xl md:text-5xl font-bold text-slate-800 text-center mb-3 font-heading tracking-tight drop-shadow-sm uppercase text-left text-left ${kioskMode === 'tv' ? 'text-5xl md:text-7xl mb-4' : 'text-3xl md:text-5xl mb-3'}`}>{slide?.title}</h3>
-               {slide?.subtitle && <p className={`text-lg md:text-xl text-slate-500 font-medium text-center mb-10 max-w-xl leading-relaxed text-left text-left ${kioskMode === 'tv' ? 'text-2xl md:text-3xl mb-12' : 'text-lg md:text-xl mb-10'}`}>{slide?.subtitle}</p>}
+          {/* CUERPO: Completamente restaurado al diseño centrado Original */}
+          <div className={`flex-1 flex flex-col items-center justify-center p-8 pt-32 relative z-10 ${scaleClass}`}>
+            <div key={safeIndex} className="w-full max-w-3xl animate-in flex flex-col items-center">
                
-               <div className="w-full h-auto p-2 text-left text-left text-left text-left">
-                 {slide?.type === 'text' && (<div className={`bg-white/70 backdrop-blur-xl p-8 rounded-[2rem] border border-white/60 shadow-lg text-center text-left text-left ${kioskMode === 'tv' ? 'md:p-12 text-left' : ''}`}>{slide?.content?.map((item, i) => (<p key={i} className={`text-xl md:text-2xl text-slate-700 leading-relaxed font-medium mb-4 last:mb-0 text-left text-left ${kioskMode === 'tv' ? 'text-3xl md:text-5xl' : 'text-xl md:text-2xl'}`}>{item.value}</p>))}</div>)}
-                 {slide?.type === 'grid' && (<div className={`flex flex-wrap justify-center gap-4 text-left text-left ${kioskMode === 'tv' ? 'gap-8' : ''}`}>{slide?.content?.map((item, i) => (<div key={i} className={`bg-white/80 p-6 rounded-2xl border border-white shadow-md min-w-[160px] text-center text-left text-left ${kioskMode === 'tv' ? 'min-w-[250px] md:min-w-[350px] p-10 text-left' : 'min-w-[160px] text-left'}`}><div className={`text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 text-left text-left ${kioskMode === 'tv' ? 'text-xl' : 'text-xs'}`}>{item.label}</div><div className={`text-3xl font-black text-coppel-blue font-heading text-left text-left ${kioskMode === 'tv' ? 'text-5xl md:text-7xl' : 'text-3xl'}`}>{item.value}</div></div>))}</div>)}
-                 {slide?.type === 'list' && (<div className={`bg-white/70 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-lg overflow-hidden max-w-4xl mx-auto text-left text-left`}>{slide?.content?.map((item, i) => (
-                   <div key={i} className={`p-5 border-b border-slate-100 last:border-0 flex items-center gap-4 text-left text-left ${kioskMode === 'tv' ? 'md:p-8 text-left' : ''}`}>
-                     <div className={`bg-green-100 text-green-600 p-1.5 rounded-full text-left text-left ${kioskMode === 'tv' ? 'p-3' : 'p-1.5'}`}><Icons.Check size={kioskMode === 'tv' ? 32 : 20}/></div>
-                     <span className={`font-medium text-slate-700 text-lg md:text-xl text-left text-left text-left ${kioskMode === 'tv' ? 'text-2xl md:text-4xl' : 'text-lg md:text-xl'}`}>{item.value}</span>
-                   </div>
-                 ))}</div>)}
-                 {slide?.type === 'image' && (<div className={`w-full h-64 md:h-96 relative rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white bg-slate-200 text-left text-left ${kioskMode ? 'h-[45vh] md:h-[55vh]' : 'h-64 md:h-96'} w-full mx-auto text-left text-left`}><img src={getDirectImageUrl(slide?.content[0]?.value)} className="w-full h-full object-contain text-left text-left" onError={(e) => {e.target.src='https://placehold.co/600x400?text=Imagen+No+Disponible';}} /></div>)}
-                 {slide?.type === 'links' && (<div className={`flex flex-col gap-3 w-full max-w-lg mx-auto text-left text-left`}>{slide?.content?.map((item, i) => (
-                    <a key={i} href={item.value} target="_blank" className={`group flex items-center gap-3 p-4 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md hover:border-coppel-blue/30 hover:-translate-y-1 transition-all cursor-pointer no-underline text-left text-left ${kioskMode === 'tv' ? 'md:p-8 text-left text-left' : ''}`}>
-                      <div className={`bg-blue-50 text-coppel-blue p-2 rounded-lg group-hover:bg-coppel-blue group-hover:text-white transition-colors text-left text-left ${kioskMode === 'tv' ? 'md:p-4 text-left' : ''}`}>{item.value.includes('.pdf') ? <Icons.File size={kioskMode === 'tv' ? 40 : 20}/> : <Icons.Link size={kioskMode === 'tv' ? 40 : 20}/>}</div>
-                      <div className="flex-1 text-left text-left text-left text-left">
-                        <div className={`font-bold text-slate-800 text-base text-left text-left ${kioskMode === 'tv' ? 'text-3xl' : 'text-base'}`}>{item.label || 'Abrir Enlace'}</div>
-                        <div className={`text-[10px] text-slate-400 truncate max-w-[250px] text-left text-left ${kioskMode === 'tv' ? 'text-lg max-w-none' : 'text-[10px]'}`}>{item.value}</div>
-                      </div>
-                      <div className="text-slate-300 group-hover:text-coppel-blue transition-colors text-left text-left"><Icons.ChevronRight size={kioskMode === 'tv' ? 40 : 18}/></div>
-                    </a>
-                  ))}</div>)}
+               {/* Icono Principal con el efecto GLOW y gradiente original restaurado */}
+               <div className="mb-8 p-6 rounded-3xl bg-gradient-to-br from-white to-slate-50 shadow-[0_10px_30px_-5px_rgba(0,85,184,0.2)] text-coppel-blue transform transition hover:scale-105 duration-300 border border-slate-100 icon-glow">
+                 <SlideIcon size={64} />
+               </div>
+
+               {/* Títulos Originales Centrados */}
+               <h3 className="text-3xl md:text-5xl font-bold text-slate-800 text-center mb-3 font-heading tracking-tight drop-shadow-sm">{slide?.title}</h3>
+               {slide?.subtitle && <p className="text-lg md:text-xl text-slate-500 font-medium text-center mb-10 max-w-xl leading-relaxed">{slide?.subtitle}</p>}
+               
+               {/* Contenido Dinámico con Estilos Originales */}
+               <div className="w-full h-auto p-2">
+                 {slide?.type === 'text' && (<div className="bg-white/70 backdrop-blur-xl p-8 rounded-[2rem] border border-white/60 shadow-lg text-center">{slide?.content?.map((item, i) => (<p key={i} className="text-xl md:text-2xl text-slate-700 leading-relaxed font-medium mb-4 last:mb-0">{item.value}</p>))}</div>)}
+                 
+                 {slide?.type === 'grid' && (<div className="flex flex-wrap justify-center gap-4">{slide?.content?.map((item, i) => (<div key={i} className="bg-white/80 p-6 rounded-2xl border border-white shadow-md min-w-[160px] text-center"><div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">{item.label}</div><div className="text-3xl font-black text-coppel-blue font-heading">{item.value}</div></div>))}</div>)}
+                 
+                 {slide?.type === 'list' && (<div className="bg-white/70 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-lg overflow-hidden">{slide?.content?.map((item, i) => (<div key={i} className="p-5 border-b border-slate-100 last:border-0 flex items-center gap-4"><div className="bg-green-100 text-green-600 p-1.5 rounded-full"><Icons.Check size={20}/></div><span className="font-medium text-slate-700 text-lg md:text-xl">{item.value}</span></div>))}</div>)}
+                 
+                 {slide?.type === 'image' && (<div className="w-full h-64 md:h-96 relative rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white bg-slate-200"><img src={getDirectImageUrl(slide?.content[0]?.value)} className="w-full h-full object-contain" onError={(e) => {e.target.src='https://placehold.co/600x400?text=Imagen+No+Disponible';}} /></div>)}
+                 
+                 {slide?.type === 'links' && (<div className="flex flex-col gap-3 w-full max-w-lg mx-auto">{slide?.content?.map((item, i) => (<a key={i} href={item.value} target="_blank" className="group flex items-center gap-3 p-4 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md hover:border-coppel-blue/30 hover:-translate-y-1 transition-all cursor-pointer no-underline"><div className="bg-blue-50 text-coppel-blue p-2 rounded-lg group-hover:bg-coppel-blue group-hover:text-white transition-colors">{item.value.includes('.pdf') ? <Icons.File size={20}/> : <Icons.Link size={20}/>}</div><div className="flex-1 text-left"><div className="font-bold text-slate-800 text-base">{item.label || 'Abrir Enlace'}</div><div className="text-[10px] text-slate-400 truncate max-w-[250px]">{item.value}</div></div><div className="text-slate-300 group-hover:text-coppel-blue"><Icons.ChevronRight size={18}/></div></a>))}</div>)}
                </div>
             </div>
           </div>
 
-          {/* FLECHAS DE NAVEGACION MANUAL (Restauradas) */}
+          {/* Controles Manuales */}
           <button onClick={(e) => { e.stopPropagation(); if(currentSlideIndex > 0) { setCurrentSlideIndex(c=>c-1); setProgress(0); } else { setCurrentSlideIndex(slides.length-1); setProgress(0); } }} className="absolute left-4 top-1/2 -translate-y-1/2 p-4 rounded-full bg-white/50 hover:bg-white backdrop-blur text-coppel-blue transition-all shadow-xl z-50 cursor-pointer active:scale-90" style={{pointerEvents: 'auto'}}><Icons.ChevronLeft size={32} /></button>
           <button onClick={(e) => { e.stopPropagation(); if(currentSlideIndex < slides.length-1) { setCurrentSlideIndex(c=>c+1); setProgress(0); } else { setCurrentSlideIndex(0); setProgress(0); } }} className="absolute right-4 top-1/2 -translate-y-1/2 p-4 rounded-full bg-white/50 hover:bg-white backdrop-blur text-coppel-blue transition-all shadow-xl z-50 cursor-pointer active:scale-90" style={{pointerEvents: 'auto'}}><Icons.ChevronRight size={32} /></button>
 
-          {/* BARRA REACCIONES */}
-          <div className={`w-full z-30 flex justify-center items-center py-2 bg-white/40 backdrop-blur-md border-t border-white/50 text-center text-center text-center`}>
-              <div className={`flex gap-4 items-center px-6 py-2 rounded-full glass-premium shadow-lg transition-transform text-center ${kioskMode === 'tv' ? 'scale-125 mb-4' : 'scale-90 mb-1'}`}>
-                  <button onClick={() => handleReaction('like')} className="hover:scale-125 transition-all p-1 text-coppel-blue active:scale-90 text-center" title="Me gusta"><Icons.ThumbsUp size={kioskMode === 'tv' ? 32 : 24}/></button>
-                  <button onClick={() => handleReaction('dislike')} className="hover:scale-125 transition-all p-1 text-slate-400 active:scale-90 text-center" title="No me gusta"><Icons.ThumbsDown size={kioskMode === 'tv' ? 32 : 24}/></button>
-                  <div className="w-px h-5 bg-slate-300 mx-1 text-center"></div>
+          {/* Barra de Reacciones (Mantenida del Actual) */}
+          <div className={`w-full z-30 flex justify-center items-center py-2 bg-white/40 backdrop-blur-md border-t border-white/50`}>
+              <div className={`flex gap-4 items-center px-6 py-2 rounded-full glass-premium shadow-lg transition-transform ${kioskMode === 'tv' ? 'scale-125 mb-4' : 'scale-90 mb-1'}`}>
+                  <button onClick={() => handleReaction('like')} className="hover:scale-125 transition-all p-1 text-coppel-blue active:scale-90" title="Me gusta"><Icons.ThumbsUp size={kioskMode === 'tv' ? 32 : 24}/></button>
+                  <button onClick={() => handleReaction('dislike')} className="hover:scale-125 transition-all p-1 text-slate-400 active:scale-90" title="No me gusta"><Icons.ThumbsDown size={kioskMode === 'tv' ? 32 : 24}/></button>
+                  <div className="w-px h-5 bg-slate-300 mx-1"></div>
                   {['❤️', '👋', '👏', '🔥'].map(emoji => (
-                      <button key={emoji} onClick={() => handleReaction(emoji)} className={`${kioskMode === 'tv' ? 'text-3xl' : 'text-2xl'} hover:scale-150 transition-all focus:outline-none active:scale-90 text-center`}>{emoji}</button>
+                      <button key={emoji} onClick={() => handleReaction(emoji)} className={`${kioskMode === 'tv' ? 'text-3xl' : 'text-2xl'} hover:scale-150 transition-all focus:outline-none active:scale-90`}>{emoji}</button>
                   ))}
               </div>
           </div>
 
-          {/* CINTILLA */}
-          <div className={`bg-coppel-yellow text-coppel-dark flex items-center relative z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-yellow-400 text-left ${kioskMode === 'tv' ? 'h-20 md:h-28' : 'h-14'}`}>
-            <div className={`bg-[#E6BC00] h-full flex items-center justify-center font-black uppercase tracking-widest z-10 shrink-0 text-left ${kioskMode === 'tv' ? 'px-12 text-3xl' : 'px-6 text-sm'}`}>Avisos Importantes</div>
-            <div className="ticker-wrap flex-1 text-left">
-              <div className={`ticker-move font-black py-2 text-left ${kioskMode === 'tv' ? 'text-4xl' : 'text-base'}`}>
-                <span className="ticker-item uppercase text-left">{data?.ticker}</span>
-                <span className="ticker-item uppercase text-left">{data?.ticker}</span>
-                <span className="ticker-item uppercase text-left">{data?.ticker}</span>
-                <span className="ticker-item uppercase text-left">{data?.ticker}</span>
+          {/* Cintilla (Ticker) Restaurada */}
+          <div className="h-14 bg-coppel-yellow text-coppel-dark flex items-center relative z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-yellow-400">
+            <div className="bg-[#E6BC00] h-full px-6 flex items-center justify-center font-bold text-sm uppercase tracking-widest z-10 shrink-0">Avisos Importantes</div>
+            <div className="ticker-wrap flex-1">
+              <div className="ticker-move text-base font-bold py-2">
+                <span className="ticker-item">{data?.ticker}</span><span className="ticker-item">{data?.ticker}</span><span className="ticker-item">{data?.ticker}</span><span className="ticker-item">{data?.ticker}</span>
               </div>
             </div>
           </div>
@@ -804,6 +796,7 @@
   </script>
 </body>
 </html>
+
 
 
 
