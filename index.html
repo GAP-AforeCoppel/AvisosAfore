@@ -95,6 +95,7 @@
       return url;
     };
 
+    // --- ICONOS RESTAURADOS (DETALLADOS) ---
     const IconWrapper = ({ children, size = 24, className = "", ...props }) => React.cloneElement(children, { width: size, height: size, className, ...props, style: { minWidth: size, minHeight: size, ...props.style } });
     
     const Icons = {
@@ -411,9 +412,9 @@
                                 </div>
                             </div>
                             {user?.role === 'admin' && (
-                                <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left">
+                                <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left">
                                     <button onClick={(e) => { e.stopPropagation(); updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notices', String(notice.id)), { pinned: !notice.pinned }); }} className={`shadow-sm border p-1 rounded-md transition-all text-center ${notice.pinned ? 'bg-yellow-100 text-yellow-600 border-yellow-200' : 'bg-white text-slate-300 hover:text-yellow-500'}`} title={notice.pinned ? "Quitar fijado" : "Fijar aviso"}><Icons.Pin size={12} className="text-center"/></button>
-                                    <button onClick={(e) => { e.stopPropagation(); updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notices', String(notice.id)), { active: !notice.active }); }} className="bg-white shadow-sm border p-1 rounded-md text-slate-300 hover:text-coppel-blue text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center" title={notice.active ? "Ocultar aviso" : "Mostrar aviso"}>{notice.active ? <Icons.EyeOff size={12} className="text-center"/> : <Icons.Eye size={12} className="text-center"/>}</button>
+                                    <button onClick={(e) => { e.stopPropagation(); updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notices', String(notice.id)), { active: !notice.active }); }} className="bg-white shadow-sm border p-1 rounded-md text-slate-300 hover:text-coppel-blue text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center text-center" title={notice.active ? "Ocultar aviso" : "Mostrar aviso"}>{notice.active ? <Icons.EyeOff size={12} className="text-center"/> : <Icons.Eye size={12} className="text-center"/>}</button>
                                 </div>
                             )}
                         </div>
@@ -428,7 +429,7 @@
       );
     }
 
-    // --- ADMIN PANEL RESTAURADO (Del archivo index (15).html) ---
+    // --- ADMIN PANEL RESTAURADO (Del archivo index 15) ---
     function AdminPanel({ onClose, activeNotice, requests }) {
        const [tab, setTab] = useState('editor');
        const [editingNotice, setEditingNotice] = useState(activeNotice || { id: null, type: 'info', title: '', subtitle: '', date: 'HOY', ticker: '', active: true, pinned: false, slides: [{ id: Date.now(), title: 'Inicio', subtitle: '', icon: 'Info', type: 'text', content: [{value: ''}] }] });
@@ -572,64 +573,7 @@
       );
     }
 
-    function ViewersModal({ notice, onClose }) {
-      const [viewers, setViewers] = useState([]);
-      const [reactions, setReactions] = useState({});
-      const [loading, setLoading] = useState(true);
-
-      useEffect(() => {
-        const fetchAll = async () => {
-          if (!notice?.id) return;
-          try {
-            const vSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'viewers'));
-            setViewers(vSnap.docs.map(d => d.data()).filter(v => v.noticeId === String(notice.id)));
-            const rSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'reactions'));
-            const rMap = {};
-            rSnap.docs.map(d => d.data()).filter(r => r.noticeId === String(notice.id)).forEach(r => { rMap[r.uid] = r.type; });
-            setReactions(rMap);
-          } catch(e) { console.error("Error visualizaciones:", e); }
-          setLoading(false);
-        };
-        fetchAll();
-      }, [notice?.id]);
-
-      const getReactionEmoji = (uid) => {
-          const type = reactions[uid];
-          if (!type) return null;
-          if (type === 'like') return '👍';
-          if (type === 'dislike') return '👎';
-          return type;
-      };
-
-      return (
-        <div className="fixed inset-0 z-[110] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in text-left text-left">
-          <div className="bg-white w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl flex flex-col max-h-[80vh] text-left text-left text-left text-left">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50 text-left text-left text-left text-left text-left">
-              <div className="text-left text-left text-left text-left text-left"><h3 className="font-bold text-slate-800 uppercase tracking-tighter text-left text-left text-left">Lectores Corporativos</h3><p className="text-[10px] text-slate-400 uppercase tracking-widest font-black text-left text-left text-left">Aviso: {notice?.title}</p></div>
-              <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors active:scale-90 text-left text-left text-left"><Icons.X size={20}/></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar text-left text-left text-left text-left text-left text-left text-left">
-              {loading ? <div className="py-10 text-center animate-pulse text-slate-400 font-bold uppercase text-[10px] tracking-widest text-center text-center text-center text-center">Sincronizando información...</div> : viewers.length === 0 ? <div className="py-10 text-center text-slate-300 italic font-medium uppercase text-xs text-center text-center text-center text-center">Sin registros de lectura confirmados.</div> : (
-                <div className="space-y-2 text-left text-left text-left text-left text-left">
-                  {viewers.map((v, i) => (
-                    <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100 animate-in text-left text-left text-left">
-                      <div className="w-10 h-10 rounded-full bg-coppel-blue/10 flex items-center justify-center text-coppel-blue font-black text-sm uppercase text-left text-left text-left">{v.name?.charAt(0) || 'U'}</div>
-                      <div className="flex-1 leading-tight text-left text-left text-left text-left text-left"><div className="font-bold text-slate-800 text-sm uppercase text-left text-left text-left text-left">{v.name || 'Usuario'}</div><div className="text-[10px] text-slate-400 font-black uppercase text-left text-left text-left text-left">{v.area || 'General'}</div></div>
-                      <div className="flex items-center gap-2 text-left text-left text-left text-left text-left">
-                        {getReactionEmoji(v.uid) && <span className="text-xl filter drop-shadow-sm text-left text-left text-left text-left">{getReactionEmoji(v.uid)}</span>}
-                        <div className="text-[9px] text-slate-300 font-black ml-2 uppercase text-left text-left text-left text-left">{v.date ? new Date(v.date).toLocaleDateString() : '-'}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="p-4 bg-slate-50 text-center text-[10px] text-slate-400 font-black border-t tracking-widest uppercase text-center text-center text-center text-center">VISTAS ÚNICAS</div>
-          </div>
-        </div>
-      );
-    }
-
+    // --- NEXT GEN VIEWER (HYBRID: Estructura Index 15 + Flechas + Emojis) ---
     function NextGenViewer({ user, data, kioskMode, onExitKiosk }) {
       const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
       const [progress, setProgress] = useState(0);
@@ -638,8 +582,8 @@
       const DURATION = 8000; 
       const slides = data?.slides || [{ title: 'Sin contenido', icon: 'Info', type: 'text', content: [] }];
       const safeIndex = (currentSlideIndex >= 0 && currentSlideIndex < slides.length) ? currentSlideIndex : 0;
-      const slide = slides[safeIndex];
-      const SlideIcon = Icons[slide?.icon] || Icons.Info;
+      const slide = slides[safeIndex] || { title: 'Cargando...', icon: 'Info', type: 'text', content: [] };
+      const SlideIcon = Icons[slide.icon] || Icons.Info;
 
       useEffect(() => { 
         setCurrentSlideIndex(0); 
@@ -702,46 +646,47 @@
               <div key={r.id} className="floating-reaction animate-fly-up text-left text-left text-left text-left" style={{ left: r.left }}>{r.emoji}</div>
           ))}
 
-          {/* CABECERA */}
-          <div className={`absolute top-0 left-0 w-full z-20 bg-gradient-to-b from-white via-white/90 to-transparent text-left text-left ${kioskMode ? 'p-6 md:p-8' : 'p-4'}`}>
-            <div className="flex gap-2 mb-3 text-left">
+          {/* CABECERA (Estilo Index 15 con el Identificador de Tipo) */}
+          <div className={`absolute top-0 left-0 w-full z-20 bg-gradient-to-b from-white via-white/90 to-transparent text-left text-left ${kioskMode ? 'p-6 md:p-8' : 'p-6'}`}>
+            <div className="flex gap-2 mb-4 text-left">
               {slides.map((_, idx) => (<div key={idx} className={`${kioskMode ? 'h-2 md:h-3' : 'h-1.5'} flex-1 bg-slate-200 rounded-full overflow-hidden text-left text-left text-left`}><div className="h-full bg-coppel-blue transition-all duration-75 ease-linear shadow-[0_0_12px_rgba(0,85,184,0.6)] text-left text-left text-left" style={{ width: idx < safeIndex ? '100%' : idx === safeIndex ? `${progress}%` : '0%' }} /></div>))}
             </div>
             <div className="flex justify-between items-start text-left text-left text-left">
-              <div className="flex gap-4 items-center text-left text-left text-left text-left">
+              <div className="flex gap-3 items-center text-left text-left text-left text-left">
+                {/* IDENTIFICADOR DE TIPO (Recuperado del Index 15) */}
                 <div className={`${kioskMode ? 'w-14 h-14 md:w-20 md:h-20 text-3xl md:text-4xl text-left' : 'w-10 h-10 text-lg'} rounded-full flex items-center justify-center text-white shadow-sm border border-slate-100 text-left text-left text-left ${data?.type === 'urgent' ? 'bg-red-500' : data?.type === 'congrats' ? 'bg-green-500' : 'bg-coppel-blue'}`}>{data?.type === 'congrats' ? '🎉' : data?.type === 'urgent' ? '⚠️' : '📢'}</div>
                 <div className="text-left text-left text-left text-left">
                     <h2 className={`font-heading font-black text-slate-800 leading-tight uppercase text-left text-left ${kioskMode === 'tv' ? 'text-4xl md:text-5xl' : kioskMode === 'pc' ? 'text-2xl md:text-3xl' : 'text-lg'}`}>{data?.title}</h2>
-                    <p className={`font-medium text-slate-500 line-clamp-1 uppercase text-left text-left ${kioskMode === 'tv' ? 'text-2xl' : kioskMode === 'pc' ? 'text-lg' : 'text-[10px]'}`}>{data?.subtitle}</p>
+                    <p className={`font-medium text-slate-500 line-clamp-1 uppercase text-left text-left ${kioskMode === 'tv' ? 'text-2xl' : kioskMode === 'pc' ? 'text-lg' : 'text-xs'}`}>{data?.subtitle}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-left text-left text-left text-left">{kioskMode && <button onClick={onExitKiosk} className="bg-black/10 hover:bg-black/20 p-2 md:p-4 rounded-full text-slate-800 transition-colors active:scale-90 text-left text-left text-left"><Icons.X size={kioskMode === 'tv' ? 40 : 24}/></button>}</div>
             </div>
           </div>
 
-          {/* CUERPO ADAPTABLE */}
-          <div className={`flex-1 flex flex-col items-center justify-center relative z-10 transition-all text-left text-left ${kioskMode ? 'pt-32 pb-4 px-10 md:px-20' : 'pt-24 pb-4 px-8'}`}>
-            <div key={safeIndex} className={`w-full animate-in flex flex-col items-center max-w-5xl text-left text-left ${scaleClass}`}>
-               <div className={`rounded-3xl bg-gradient-to-br from-white to-slate-50 shadow-[0_10px_30px_-5px_rgba(0,85,184,0.2)] text-coppel-blue transform transition hover:scale-105 duration-300 border border-slate-100 icon-glow text-left text-left ${kioskMode === 'tv' ? 'mb-8 p-8 md:p-12' : 'mb-4 p-4'}`}><SlideIcon size={kioskMode === 'tv' ? 120 : 64} /></div>
-               <h3 className={`font-bold text-slate-800 text-center font-heading tracking-tight drop-shadow-sm uppercase text-left text-left ${kioskMode === 'tv' ? 'text-5xl md:text-7xl mb-4' : kioskMode === 'pc' ? 'text-4xl md:text-5xl mb-3' : 'text-2xl md:text-3xl mb-2'}`}>{slide?.title}</h3>
-               {slide?.subtitle && <p className={`text-slate-500 font-medium text-center max-w-4xl leading-relaxed text-left text-left ${kioskMode === 'tv' ? 'text-2xl md:text-3xl mb-8' : 'text-sm md:text-lg mb-4'}`}>{slide?.subtitle}</p>}
+          {/* CUERPO ADAPTABLE (Diseño Index 15 Recuperado) */}
+          <div className={`flex-1 flex flex-col items-center justify-center relative z-10 transition-all text-left text-left ${kioskMode ? 'pt-32 pb-4 px-10 md:px-20' : 'pt-32 pb-8 px-8'}`}>
+            <div key={safeIndex} className={`w-full animate-in flex flex-col items-center max-w-3xl text-left text-left ${scaleClass}`}>
+               <div className={`mb-8 p-6 rounded-3xl bg-gradient-to-br from-white to-slate-50 shadow-[0_10px_30px_-5px_rgba(0,85,184,0.2)] text-coppel-blue transform transition hover:scale-105 duration-300 border border-slate-100 icon-glow text-left text-left ${kioskMode === 'tv' ? 'mb-8 p-8 md:p-12' : 'mb-8 p-6'}`}><SlideIcon size={kioskMode === 'tv' ? 120 : 64} /></div>
+               <h3 className={`text-3xl md:text-5xl font-bold text-slate-800 text-center mb-3 font-heading tracking-tight drop-shadow-sm uppercase text-left text-left ${kioskMode === 'tv' ? 'text-5xl md:text-7xl mb-4' : 'text-3xl md:text-5xl mb-3'}`}>{slide?.title}</h3>
+               {slide?.subtitle && <p className={`text-lg md:text-xl text-slate-500 font-medium text-center mb-10 max-w-xl leading-relaxed text-left text-left ${kioskMode === 'tv' ? 'text-2xl md:text-3xl mb-12' : 'text-lg md:text-xl mb-10'}`}>{slide?.subtitle}</p>}
                
-               <div className="w-full max-h-[50vh] md:max-h-[60vh] overflow-y-auto custom-scrollbar p-1 text-left text-left text-left text-left">
-                 {slide?.type === 'text' && (<div className={`bg-white/70 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-lg text-center p-6 text-left text-left ${kioskMode === 'tv' ? 'md:p-12 text-left' : ''}`}>{slide?.content?.map((item, i) => (<p key={i} className={`text-slate-700 leading-relaxed font-medium mb-3 last:mb-0 text-left text-left ${kioskMode === 'tv' ? 'text-2xl md:text-4xl' : 'text-lg md:text-xl'}`}>{item.value}</p>))}</div>)}
-                 {slide?.type === 'grid' && (<div className={`flex flex-wrap justify-center gap-4 text-left text-left ${kioskMode === 'tv' ? 'gap-8' : ''}`}>{slide?.content?.map((item, i) => (<div key={i} className={`bg-white/80 rounded-2xl border border-white shadow-md text-center flex flex-col justify-center p-4 text-left text-left ${kioskMode === 'tv' ? 'min-w-[250px] md:min-w-[350px] p-10 text-left' : 'min-w-[140px] text-left'}`}><div className={`font-bold text-slate-400 uppercase tracking-widest mb-1 text-left text-left ${kioskMode === 'tv' ? 'text-xl' : 'text-[9px]'}`}>{item.label}</div><div className={`font-black text-coppel-blue font-heading text-left text-left ${kioskMode === 'tv' ? 'text-5xl md:text-7xl' : 'text-2xl md:text-4xl'}`}>{item.value}</div></div>))}</div>)}
+               <div className="w-full h-auto p-2 text-left text-left text-left text-left">
+                 {slide?.type === 'text' && (<div className={`bg-white/70 backdrop-blur-xl p-8 rounded-[2rem] border border-white/60 shadow-lg text-center text-left text-left ${kioskMode === 'tv' ? 'md:p-12 text-left' : ''}`}>{slide?.content?.map((item, i) => (<p key={i} className={`text-xl md:text-2xl text-slate-700 leading-relaxed font-medium mb-4 last:mb-0 text-left text-left ${kioskMode === 'tv' ? 'text-3xl md:text-5xl' : 'text-xl md:text-2xl'}`}>{item.value}</p>))}</div>)}
+                 {slide?.type === 'grid' && (<div className={`flex flex-wrap justify-center gap-4 text-left text-left ${kioskMode === 'tv' ? 'gap-8' : ''}`}>{slide?.content?.map((item, i) => (<div key={i} className={`bg-white/80 p-6 rounded-2xl border border-white shadow-md min-w-[160px] text-center text-left text-left ${kioskMode === 'tv' ? 'min-w-[250px] md:min-w-[350px] p-10 text-left' : 'min-w-[160px] text-left'}`}><div className={`text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 text-left text-left ${kioskMode === 'tv' ? 'text-xl' : 'text-xs'}`}>{item.label}</div><div className={`text-3xl font-black text-coppel-blue font-heading text-left text-left ${kioskMode === 'tv' ? 'text-5xl md:text-7xl' : 'text-3xl'}`}>{item.value}</div></div>))}</div>)}
                  {slide?.type === 'list' && (<div className={`bg-white/70 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-lg overflow-hidden max-w-4xl mx-auto text-left text-left`}>{slide?.content?.map((item, i) => (
-                   <div key={i} className={`border-b border-slate-100 last:border-0 flex items-center gap-4 p-4 text-left text-left ${kioskMode === 'tv' ? 'md:p-8 text-left' : ''}`}>
-                     <div className={`bg-green-100 text-green-600 rounded-full text-left text-left ${kioskMode === 'tv' ? 'p-3' : 'p-1'}`}><Icons.Check size={kioskMode === 'tv' ? 32 : 18}/></div>
-                     <span className={`font-medium text-slate-700 text-left text-left text-left ${kioskMode === 'tv' ? 'text-2xl md:text-4xl' : 'text-base md:text-xl'}`}>{item.value}</span>
+                   <div key={i} className={`p-5 border-b border-slate-100 last:border-0 flex items-center gap-4 text-left text-left ${kioskMode === 'tv' ? 'md:p-8 text-left' : ''}`}>
+                     <div className={`bg-green-100 text-green-600 p-1.5 rounded-full text-left text-left ${kioskMode === 'tv' ? 'p-3' : 'p-1.5'}`}><Icons.Check size={kioskMode === 'tv' ? 32 : 20}/></div>
+                     <span className={`font-medium text-slate-700 text-lg md:text-xl text-left text-left text-left ${kioskMode === 'tv' ? 'text-2xl md:text-4xl' : 'text-lg md:text-xl'}`}>{item.value}</span>
                    </div>
                  ))}</div>)}
-                 {slide?.type === 'image' && (<div className={`relative rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white bg-slate-200 text-left text-left ${kioskMode ? 'h-[45vh] md:h-[55vh]' : 'h-64 md:h-[400px]'} w-full mx-auto text-left text-left`}><img src={getDirectImageUrl(slide?.content[0]?.value)} className="w-full h-full object-contain text-left text-left" onError={(e) => {e.target.src='https://placehold.co/1200x800?text=Imagen+No+Disponible';}} /></div>)}
-                 {slide?.type === 'links' && (<div className={`flex flex-col gap-4 w-full mx-auto max-w-2xl text-left text-left`}>{slide?.content?.map((item, i) => (
-                    <a key={i} href={item.value} target="_blank" className={`group flex items-center gap-4 bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md hover:border-coppel-blue/30 hover:-translate-y-1 transition-all cursor-pointer no-underline p-4 text-left text-left ${kioskMode === 'tv' ? 'md:p-8 text-left text-left' : ''}`}>
-                      <div className={`bg-blue-50 text-coppel-blue rounded-lg group-hover:bg-coppel-blue group-hover:text-white transition-colors p-2 text-left text-left ${kioskMode === 'tv' ? 'md:p-4 text-left' : ''}`}>{item.value.includes('.pdf') ? <Icons.File size={kioskMode === 'tv' ? 40 : 20}/> : <Icons.Link size={kioskMode === 'tv' ? 40 : 20}/>}</div>
+                 {slide?.type === 'image' && (<div className={`w-full h-64 md:h-96 relative rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white bg-slate-200 text-left text-left ${kioskMode ? 'h-[45vh] md:h-[55vh]' : 'h-64 md:h-96'} w-full mx-auto text-left text-left`}><img src={getDirectImageUrl(slide?.content[0]?.value)} className="w-full h-full object-contain text-left text-left" onError={(e) => {e.target.src='https://placehold.co/600x400?text=Imagen+No+Disponible';}} /></div>)}
+                 {slide?.type === 'links' && (<div className={`flex flex-col gap-3 w-full max-w-lg mx-auto text-left text-left`}>{slide?.content?.map((item, i) => (
+                    <a key={i} href={item.value} target="_blank" className={`group flex items-center gap-3 p-4 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md hover:border-coppel-blue/30 hover:-translate-y-1 transition-all cursor-pointer no-underline text-left text-left ${kioskMode === 'tv' ? 'md:p-8 text-left text-left' : ''}`}>
+                      <div className={`bg-blue-50 text-coppel-blue p-2 rounded-lg group-hover:bg-coppel-blue group-hover:text-white transition-colors text-left text-left ${kioskMode === 'tv' ? 'md:p-4 text-left' : ''}`}>{item.value.includes('.pdf') ? <Icons.File size={kioskMode === 'tv' ? 40 : 20}/> : <Icons.Link size={kioskMode === 'tv' ? 40 : 20}/>}</div>
                       <div className="flex-1 text-left text-left text-left text-left">
-                        <div className={`font-bold text-slate-800 text-left text-left ${kioskMode === 'tv' ? 'text-3xl' : 'text-base'}`}>{item.label || 'Abrir Enlace'}</div>
-                        <div className={`text-slate-400 truncate text-left text-left ${kioskMode === 'tv' ? 'text-lg' : 'text-[10px]'}`}>{item.value}</div>
+                        <div className={`font-bold text-slate-800 text-base text-left text-left ${kioskMode === 'tv' ? 'text-3xl' : 'text-base'}`}>{item.label || 'Abrir Enlace'}</div>
+                        <div className={`text-[10px] text-slate-400 truncate max-w-[250px] text-left text-left ${kioskMode === 'tv' ? 'text-lg max-w-none' : 'text-[10px]'}`}>{item.value}</div>
                       </div>
                       <div className="text-slate-300 group-hover:text-coppel-blue transition-colors text-left text-left"><Icons.ChevronRight size={kioskMode === 'tv' ? 40 : 18}/></div>
                     </a>
@@ -749,6 +694,10 @@
                </div>
             </div>
           </div>
+
+          {/* FLECHAS DE NAVEGACION MANUAL (Restauradas) */}
+          <button onClick={(e) => { e.stopPropagation(); if(currentSlideIndex > 0) { setCurrentSlideIndex(c=>c-1); setProgress(0); } else { setCurrentSlideIndex(slides.length-1); setProgress(0); } }} className="absolute left-4 top-1/2 -translate-y-1/2 p-4 rounded-full bg-white/50 hover:bg-white backdrop-blur text-coppel-blue transition-all shadow-xl z-50 cursor-pointer active:scale-90" style={{pointerEvents: 'auto'}}><Icons.ChevronLeft size={32} /></button>
+          <button onClick={(e) => { e.stopPropagation(); if(currentSlideIndex < slides.length-1) { setCurrentSlideIndex(c=>c+1); setProgress(0); } else { setCurrentSlideIndex(0); setProgress(0); } }} className="absolute right-4 top-1/2 -translate-y-1/2 p-4 rounded-full bg-white/50 hover:bg-white backdrop-blur text-coppel-blue transition-all shadow-xl z-50 cursor-pointer active:scale-90" style={{pointerEvents: 'auto'}}><Icons.ChevronRight size={32} /></button>
 
           {/* BARRA REACCIONES */}
           <div className={`w-full z-30 flex justify-center items-center py-2 bg-white/40 backdrop-blur-md border-t border-white/50 text-center text-center text-center`}>
@@ -763,7 +712,7 @@
           </div>
 
           {/* CINTILLA */}
-          <div className={`bg-coppel-yellow text-coppel-dark flex items-center relative z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-yellow-400 text-left ${kioskMode === 'tv' ? 'h-20 md:h-28' : 'h-12 md:h-14'}`}>
+          <div className={`bg-coppel-yellow text-coppel-dark flex items-center relative z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-yellow-400 text-left ${kioskMode === 'tv' ? 'h-20 md:h-28' : 'h-14'}`}>
             <div className={`bg-[#E6BC00] h-full flex items-center justify-center font-black uppercase tracking-widest z-10 shrink-0 text-left ${kioskMode === 'tv' ? 'px-12 text-3xl' : 'px-6 text-sm'}`}>Avisos Importantes</div>
             <div className="ticker-wrap flex-1 text-left">
               <div className={`ticker-move font-black py-2 text-left ${kioskMode === 'tv' ? 'text-4xl' : 'text-base'}`}>
@@ -783,4 +732,5 @@
   </script>
 </body>
 </html>
+
 
